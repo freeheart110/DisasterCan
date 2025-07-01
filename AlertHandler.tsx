@@ -41,7 +41,6 @@ const getAlertBaseUrl = (region: string): string => {
   return `https://dd.weather.gc.ca/alerts/cap/${today}/${region}/`;
 };
 
-// The `area` can be either a single object or an array of objects.
 const parseAreaDesc = (area: any): string => {
   if (!area) return 'N/A';
   if (Array.isArray(area)) {
@@ -192,6 +191,7 @@ export default function App() {
           const jsonData = parser.parse(xmlData);
 
           // A CAP alert can have one <info> block (object) or many (array).
+          // This normalization ensures `infos` is always an array for consistent processing.
           const alert = jsonData.alert || {};
           let infos = alert.info || [];
           if (!Array.isArray(infos)) {
@@ -206,13 +206,9 @@ export default function App() {
           //     area: parseAreaDesc(info.area),
           //   });
           // });
-
-          // For debugging: log the raw info object to the console.
           infos.forEach((info: CapInfo, idx: number) => {
             console.log("Info object:", info);
           });
-
-          // Map each info block to the app's clean `Alert` interface.
           const parsed = infos.map((info: CapInfo, idx: number): Alert => {
             const areaDescValue = parseAreaDesc(info.area);
             return {
