@@ -1,6 +1,15 @@
 {
-  "extends": "expo/tsconfig.base",
+  "extends": "expo/tsconfig.base",      
   "compilerOptions": {
-    "strict": true
-  }
+    "strict": true,                     
+    "baseUrl": "./src",
+    "paths": {
+      "@/*": ["*"]
+    },
+    "jsx": "react-native",
+    "types": ["jest", "react-native"]
+  },
+  // Folders (globs) TypeScript should include / exclude
+  "include": ["app", "src", "tests"],  
+  "exclude": ["node_modules", "android", "ios", ".expo"]
 }
