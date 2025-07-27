@@ -1,0 +1,186 @@
+import axios from 'axios';
+import { XMLParser } from 'fast-xml-parser';
+import * as Location from 'expo-location';
+
+// --- TYPE DEFINITIONS ---
+
+export interface Alert {
+  id: string;
+  title: string;
+  summary: string;
+  event: string;
+  severity: string;
+  areaDesc: string;
+  productCode: string;
+}
+
+interface CapInfo {
+  area?: { areaDesc?: string }[] | { areaDesc?: string };
+  headline?: string;
+  description?: string;
+  event?: string;
+  severity?: string;
+  [key: string]: unknown; // Allow extra fields from XML
+}
+
+interface CapAlert {
+  identifier?: string;
+  info?: CapInfo | CapInfo[];
+}
+
+interface ParsedFilename {
+  filename: string;
+  productCode: string;
+  timestamp: string;
+  sequence: number;
+}
+
+// --- UTILS ---
+
+const getAlertBaseUrl = (region: string): string => {
+  const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  return `https://dd.weather.gc.ca/alerts/cap/${today}/${region}/`;
+};
+
+// The `area` can be either a single object or an array of objects.
+const parseAreaDesc = (area: CapInfo['area']): string => {
+  if (!area) return 'N/A';
+  if (Array.isArray(area)) {
+    return area.map(a => a.areaDesc ?? 'N/A').join(', ');
+  } else {
+    return area.areaDesc ?? 'N/A';
+  }
+};
+
+const parseFilename = (filename: string): ParsedFilename => {
+  const parts = filename.split('_');
+  const productCode = parts[1];
+  const timestamp = parts[4];
+  const sequence = parseInt(parts[5].replace('.cap', ''), 10);
+  return { filename, productCode, timestamp, sequence };
+};
+
+// Map coordinates to Environment Canada regions
+const getRegionFromLocation = async (): Promise<string> => {
+  const { status } = await Location.requestForegroundPermissionsAsync();
+  if (status !== 'granted') {
+    throw new Error('Permission to access location was denied');
+  }
+
+  const loc = await Location.getCurrentPositionAsync({});
+  const lat = loc.coords.latitude;
+  const lon = loc.coords.longitude;
+
+  if (lat >= 60) return 'CWNT'; // Territories
+  if (lon <= -120) return 'CWVR'; // BC
+  if (lon > -120 && lon <= -95) return 'CWWG'; // Prairies provinces (includes Alberta, Sask, Manitoba)
+  if (lon > -95 && lon <= -80) return 'CWTO'; // Ontario
+  if (lon > -80 && lon <= -67) return 'CWUL'; // Quebec
+  if (lon > -67) return 'CWHX'; // Atlantic
+  return 'CWTO';
+};
+
+// --- MAIN WORKFLOW ---
+
+export const getLatestAlerts = async (): Promise<Alert[]> => {
+  const region = await getRegionFromLocation();
+
+  // STEP 1: Find the latest hourly subdirectory for today's alerts.
+  const ALERT_BASE_URL = getAlertBaseUrl(region);
+
+  // Get all hourly subdirectories (e.g., "00/", "01/") from the page.
+  const dirResponse = await axios.get(ALERT_BASE_URL);
+  const subdirs: string[] = [];
+  const regex = /href="(\d{2}\/)"/g;
+  let match: RegExpExecArray | null;
+  while ((match = regex.exec(dirResponse.data)) !== null) {
+    subdirs.push(match[1]);
+  }
+
+  if (subdirs.length === 0) {
+    throw new Error('No subdirectories found for this region.');
+  }
+
+  // Sort to find the most recent hour (e.g., "23/").
+  const latestSubdir = subdirs.sort().reverse()[0];
+  const subdirUrl = `${ALERT_BASE_URL}${latestSubdir}`;
+
+  // STEP 2: Get all .cap filenames from the latest hourly directory.
+  const subdirResponse = await axios.get(subdirUrl);
+  const capFiles: string[] = [];
+  const capRegex = /href="([^"]*\.cap)"/g;
+  while ((match = capRegex.exec(subdirResponse.data)) !== null) {
+    capFiles.push(match[1]);
+  }
+
+  if (capFiles.length === 0) {
+    throw new Error('No CAP files found.');
+  }
+
+  // STEP 3: Filter for the single latest version of each unique alert.
+  const parsedFiles = capFiles.map(parseFilename);
+  const groupedByProduct: { [key: string]: ParsedFilename[] } = {};
+
+  // Group alerts by product code to handle multiple updates to the same alert.
+  for (const file of parsedFiles) {
+    if (!groupedByProduct[file.productCode]) {
+      groupedByProduct[file.productCode] = [];
+    }
+    groupedByProduct[file.productCode].push(file);
+  }
+
+  const latestFiles: ParsedFilename[] = [];
+  // For each group, find the single most recent file.
+  for (const productCode in groupedByProduct) {
+    const files = groupedByProduct[productCode];
+    // Sort by timestamp then sequence number to find the absolute latest file.
+    files.sort((a, b) => {
+      if (b.timestamp !== a.timestamp) {
+        return b.timestamp.localeCompare(a.timestamp);
+      }
+      return b.sequence - a.sequence;
+    });
+    latestFiles.push(files[0]);
+  }
+
+  // STEP 4: Fetch and parse the content for each of the final alert files.
+  const allAlerts: Alert[] = [];
+  for (const cap of latestFiles) {
+    const capUrl = `${subdirUrl}${cap.filename}`;
+
+    const capResponse = await axios.get(capUrl);
+    const xmlData = capResponse.data;
+
+    // Convert the raw XML data into a JSON object.
+    const parser = new XMLParser({
+      ignoreAttributes: false,
+      attributeNamePrefix: '',
+    });
+    const jsonData: { alert: CapAlert } = parser.parse(xmlData);
+
+    // A CAP alert can have one <info> block (object) or many (array).
+    const alertData = jsonData.alert || {};
+    let infos = alertData.info || [];
+    if (!Array.isArray(infos)) {
+      infos = infos ? [infos] : [];
+    }
+
+    // Map each info block to the app's clean `Alert` interface.
+    const parsed = infos.map((info: CapInfo, idx: number): Alert => {
+      const areaDescValue = parseAreaDesc(info.area);
+      return {
+        id: `${alertData.identifier ?? cap.filename}-${idx}`,
+        title: info.headline ?? 'N/A',
+        summary: info.description ?? 'N/A',
+        event: info.event ?? 'N/A',
+        severity: info.severity ?? 'N/A',
+        areaDesc: areaDescValue,
+        productCode: cap.productCode,
+      };
+    });
+
+    allAlerts.push(...parsed);
+  }
+
+  return allAlerts;
+};
