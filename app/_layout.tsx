@@ -1,11 +1,16 @@
-import { Tabs } from 'expo-router';
+import { Stack } from 'expo-router';
+import React from 'react';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
-export default function Layout() {
+export default function RootLayout(): JSX.Element {
   return (
-    <Tabs>
-      <Tabs.Screen name="home" options={{ title: 'Home' }} />
-      <Tabs.Screen name="alerts" options={{ title: 'Alerts' }} />
-      {/* Add others: prepare, resources */}
-    </Tabs>
+    <SafeAreaProvider>
+      {/* <Provider store={yourAlertStore}> */} {/* Uncomment if needed */}
+        <Stack>
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="alerts/[region]" options={{ title: 'Alert Details' }} />
+        </Stack>
+      {/* </Provider> */}
+    </SafeAreaProvider>
   );
 }

@@ -1,7 +1,7 @@
 import { View, Text, FlatList, StyleSheet } from 'react-native';
 import { useAlerts } from '../../src/hooks/useAlerts';
 
-const AlertsScreen = () => {
+const AlertsScreen = (): JSX.Element => {
   const { alerts, loading, error } = useAlerts();
 
   if (loading) return <Text>Loading alerts...</Text>;

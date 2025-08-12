@@ -1,6 +1,6 @@
 module.exports = {
   preset: 'jest-expo',
-  setupFilesAfterEnv: ['@testing-library/react-native/extend-expect'],
+  setupFilesAfterEnv: [],
   transformIgnorePatterns: [
     'node_modules/(?!(jest-)?react-native|@react-native|@expo|expo(nent)?|@expo/.*|@unimodules)',
   ],
