@@ -12,6 +12,8 @@ export interface Alert {
   severity: string;
   areaDesc: string;
   productCode: string;
+  published: string;
+  region: string;
 }
 
 interface CapInfo {
@@ -25,6 +27,7 @@ interface CapInfo {
 
 interface CapAlert {
   identifier?: string;
+  sent?: string;
   info?: CapInfo | CapInfo[];
 }
 
@@ -71,6 +74,9 @@ const getRegionFromLocation = async (): Promise<string> => {
   const lat = loc.coords.latitude;
   const lon = loc.coords.longitude;
 
+  // Log GPS location
+  console.log('GPS Location:', { latitude: lat, longitude: lon });
+
   if (lat >= 60) return 'CWNT'; // Territories
   if (lon <= -120) return 'CWVR'; // BC
   if (lon > -120 && lon <= -95) return 'CWWG'; // Prairies provinces (includes Alberta, Sask, Manitoba)
@@ -85,11 +91,28 @@ const getRegionFromLocation = async (): Promise<string> => {
 export const getLatestAlerts = async (): Promise<Alert[]> => {
   const region = await getRegionFromLocation();
 
+  // Log region code
+  console.log('Region Code:', region);
+
   // STEP 1: Find the latest hourly subdirectory for today's alerts.
   const ALERT_BASE_URL = getAlertBaseUrl(region);
 
   // Get all hourly subdirectories (e.g., "00/", "01/") from the page.
-  const dirResponse = await axios.get(ALERT_BASE_URL);
+  let dirResponse;
+
+  try {
+    // Try to fetch the list of hourly subdirectories for today.
+    dirResponse = await axios.get(ALERT_BASE_URL);
+  } catch (error) {
+    if (axios.isAxiosError(error) && error.response?.status === 404) {
+      console.log(`No alert directory found for region ${region} today.`);
+      return []; // Return an empty array, not an error.
+    }
+    // Throw any other type of error.
+    throw error;
+  }
+
+  
   const subdirs: string[] = [];
   const regex = /href="(\d{2}\/)"/g;
   let match: RegExpExecArray | null;
@@ -101,7 +124,7 @@ export const getLatestAlerts = async (): Promise<Alert[]> => {
     throw new Error('No subdirectories found for this region.');
   }
 
-  // Sort to find the most recent hour (e.g., "23/").
+  // Sort to find the most recent hour.
   const latestSubdir = subdirs.sort().reverse()[0];
   const subdirUrl = `${ALERT_BASE_URL}${latestSubdir}`;
 
@@ -158,6 +181,9 @@ export const getLatestAlerts = async (): Promise<Alert[]> => {
     });
     const jsonData: { alert: CapAlert } = parser.parse(xmlData);
 
+    // Log the CAP file name
+    console.log('CAP File Name:', cap.filename);
+
     // A CAP alert can have one <info> block (object) or many (array).
     const alertData = jsonData.alert || {};
     let infos = alertData.info || [];
@@ -176,7 +202,24 @@ export const getLatestAlerts = async (): Promise<Alert[]> => {
         severity: info.severity ?? 'N/A',
         areaDesc: areaDescValue,
         productCode: cap.productCode,
+        published: alertData.sent ?? 'N/A',
+        region: region,
       };
+    });
+
+    // Log the alert info for each parsed alert
+    parsed.forEach(alert => {
+      console.log('Alert Info:', {
+        id: alert.id,
+        title: alert.title,
+        summary: alert.summary,
+        event: alert.event,
+        severity: alert.severity,
+        areaDesc: alert.areaDesc,
+        productCode: alert.productCode,
+        published: alert.published,
+        region: alert.region,
+      });
     });
 
     allAlerts.push(...parsed);

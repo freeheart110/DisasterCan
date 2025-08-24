@@ -19,7 +19,7 @@ export const useAlerts = () => {
       }
     };
     fetchAlerts();
-    // Optional: Poll every 60 seconds for updates
+    // Poll every 60 seconds for updates
     // const interval = setInterval(fetchAlerts, 60000);
     // return () => clearInterval(interval);
   }, []);
