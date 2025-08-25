@@ -1,19 +1,5 @@
-export interface ChecklistItem {
-  id: string;
-  text: string;
-  completed: boolean;
-}
+import type { Quest } from '../types';
 
-export interface Quest {
-  id: string;
-  title: string;
-  categories: {
-    title: string;
-    items: ChecklistItem[];
-  }[];
-}
-
-// The data for the "Build a 72-Hour Kit" quest.
 export const seventyTwoHourKitQuest: Quest = {
   id: 'kit-1',
   title: 'Build a 72-Hour Kit',

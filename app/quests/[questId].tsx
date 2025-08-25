@@ -1,11 +1,11 @@
 import React from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, SafeAreaView } from 'react-native';
-import { Stack, useRouter } from 'expo-router';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, SafeAreaView, ActivityIndicator } from 'react-native';
+import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useQuestStore } from '../src/state/questStore';
-import type { ChecklistItem } from '../src/constants/quests';
+import { useQuestStore } from '../../src/state/questStore';
+import type { ChecklistItem } from '../../src/constants/quests/types';
 
-// Reusable Checklist Item Component
+// Reusable Checklist Item Component (this can be moved to src/components later)
 const ChecklistItemComponent = ({ item, onToggle }: { item: ChecklistItem; onToggle: () => void }) => (
   <TouchableOpacity style={styles.itemContainer} onPress={onToggle}>
     <Ionicons
@@ -19,26 +19,29 @@ const ChecklistItemComponent = ({ item, onToggle }: { item: ChecklistItem; onTog
   </TouchableOpacity>
 );
 
-export default function KitChecklistScreen(): React.JSX.Element {
+export default function QuestDetailScreen(): React.JSX.Element {
   const router = useRouter();
-  
-  // 1. Get the functions and the entire quests array from the store.
+  const { questId } = useLocalSearchParams<{ questId: string }>(); // Get the questId from the URL
+
+  // Get state and actions from the store
   const quests = useQuestStore(state => state.quests);
+  const isLoading = useQuestStore(state => state.isLoading);
   const toggleItemCompleted = useQuestStore(state => state.toggleItemCompleted);
   const getQuestProgress = useQuestStore(state => state.getQuestProgress);
 
-  // 2. Find the specific quest we want to display on this screen.
-  const kitQuestId = 'kit-1'; // The ID from constants/quests.ts file
-  const kitQuest = quests.find(q => q.id === kitQuestId);
+  // Find the specific quest to display based on the questId from the URL
+  const quest = quests.find(q => q.id === questId);
+  const progress = questId ? getQuestProgress(questId) : 0;
 
-  // 3. Calculate the progress for this specific quest.
-  const progress = getQuestProgress(kitQuestId);
+  // Handle loading and error states
+  if (isLoading) {
+    return <ActivityIndicator style={{ flex: 1 }} />;
+  }
 
-  // Handle the case where the quest might not be found.
-  if (!kitQuest) {
+  if (!quest) {
     return (
       <SafeAreaView style={styles.safeArea}>
-        <Text>Error: 72-Hour Kit quest not found.</Text>
+        <Text>Error: Quest not found.</Text>
       </SafeAreaView>
     );
   }
@@ -47,7 +50,7 @@ export default function KitChecklistScreen(): React.JSX.Element {
     <SafeAreaView style={styles.safeArea}>
       <Stack.Screen 
         options={{ 
-          headerTitle: '72-Hour Kit',
+          headerTitle: quest.title, // Set the header title dynamically
           headerLeft: () => (
             <TouchableOpacity onPress={() => router.back()} style={{ marginLeft: 10 }}>
               <Ionicons name="chevron-back" size={28} color="#007AFF" />
@@ -56,7 +59,7 @@ export default function KitChecklistScreen(): React.JSX.Element {
         }} 
       />
       <FlatList
-        data={kitQuest.categories}
+        data={quest.categories}
         keyExtractor={(category) => category.title}
         renderItem={({ item: category }) => (
           <View style={styles.categoryContainer}>
@@ -65,8 +68,7 @@ export default function KitChecklistScreen(): React.JSX.Element {
               <ChecklistItemComponent
                 key={item.id}
                 item={item}
-                // 4. Pass the questId to the toggle function.
-                onToggle={() => toggleItemCompleted(kitQuestId, category.title, item.id)}
+                onToggle={() => toggleItemCompleted(quest.id, category.title, item.id)}
               />
             ))}
           </View>
@@ -85,6 +87,7 @@ export default function KitChecklistScreen(): React.JSX.Element {
   );
 }
 
+// Styles are the same as your old kit-checklist.tsx file
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#f4f7f9' },
   listContent: { padding: 20 },

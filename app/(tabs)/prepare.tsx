@@ -1,13 +1,30 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, FlatList } from 'react-native';
 import { Link } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuestStore } from '../../src/state/questStore';
+import type { Quest } from '../../src/constants/quests/types';
+
+// A reusable component for displaying a single quest card
+const QuestCard = ({ quest }: { quest: Quest }) => {
+  const getQuestProgress = useQuestStore(state => state.getQuestProgress);
+  const progress = getQuestProgress(quest.id);
+
+  return (
+    <Link href={`/quests/${quest.id}`} asChild>
+      <TouchableOpacity style={styles.questCard}>
+        <View>
+          <Text style={styles.questTitle}>{quest.title}</Text>
+          <Text style={styles.questProgress}>{progress}% Complete</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={24} color="#3498db" />
+      </TouchableOpacity>
+    </Link>
+  );
+};
 
 export default function PrepareScreen(): React.JSX.Element {
-  const getQuestProgress = useQuestStore(state => state.getQuestProgress);
-  const kitQuestId = 'kit-1'; // The ID from constants/quests.ts file
-  const progress = getQuestProgress(kitQuestId);
+  const quests = useQuestStore(state => state.quests);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -15,17 +32,12 @@ export default function PrepareScreen(): React.JSX.Element {
         <Text style={styles.header}>Preparedness Quests</Text>
         <Text style={styles.subHeader}>Complete these quests to become more resilient.</Text>
 
-        {/* Quest Card for the 72-Hour Kit */}
-        <Link href="/kit-checklist" asChild>
-          <TouchableOpacity style={styles.questCard}>
-            <View>
-              <Text style={styles.questTitle}>Build a 72-Hour Kit</Text>
-              <Text style={styles.questProgress}>{progress}% Complete</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={24} color="#3498db" />
-          </TouchableOpacity>
-        </Link>
-        
+        <FlatList
+          data={quests}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => <QuestCard quest={item} />}
+          contentContainerStyle={{ gap: 16 }}
+        />
       </View>
     </SafeAreaView>
   );
