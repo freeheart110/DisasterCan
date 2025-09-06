@@ -14,12 +14,25 @@ export interface Alert {
   productCode: string;
   published: string;
   region: string;
+  headline: string;
+  description: string;
+  instruction: string;
+  polygon?: string; // A polygon might not exist for every alert
 }
 
+// A specific type for the <area> block in a CAP file.
+interface CapArea {
+  areaDesc?: string;
+  polygon?: string;
+}
+
+// A specific type for the <info> block in a CAP file.
 interface CapInfo {
-  area?: { areaDesc?: string }[] | { areaDesc?: string };
+  language?: string;
+  area?: CapArea[] | CapArea;
   headline?: string;
   description?: string;
+  instruction?: unknown; // Use 'unknown' to force a type check later
   event?: string;
   severity?: string;
   [key: string]: unknown; // Allow extra fields from XML
@@ -49,10 +62,17 @@ const getAlertBaseUrl = (region: string): string => {
 const parseAreaDesc = (area: CapInfo['area']): string => {
   if (!area) return 'N/A';
   if (Array.isArray(area)) {
-    return area.map(a => a.areaDesc ?? 'N/A').join(', ');
-  } else {
-    return area.areaDesc ?? 'N/A';
+    return area.map((a: CapArea) => a.areaDesc ?? 'N/A').join(', ');
   }
+  return (area as CapArea).areaDesc ?? 'N/A';
+};
+
+const getFirstPolygon = (area: CapInfo['area']): string | undefined => {
+  if (!area) return undefined;
+  if (Array.isArray(area)) {
+    return area[0]?.polygon;
+  }
+  return (area as CapArea).polygon;
 };
 
 const parseFilename = (filename: string): ParsedFilename => {
@@ -96,10 +116,8 @@ export const getLatestAlerts = async (): Promise<Alert[]> => {
 
   // STEP 1: Find the latest hourly subdirectory for today's alerts.
   const ALERT_BASE_URL = getAlertBaseUrl(region);
-
-  // Get all hourly subdirectories (e.g., "00/", "01/") from the page.
+  
   let dirResponse;
-
   try {
     // Try to fetch the list of hourly subdirectories for today.
     dirResponse = await axios.get(ALERT_BASE_URL);
@@ -109,9 +127,9 @@ export const getLatestAlerts = async (): Promise<Alert[]> => {
       return []; // Return an empty array, not an error.
     }
     // Throw any other type of error.
-    throw error;
+    console.error('Failed to get latest alerts:', error);
+    throw new Error('Failed to fetch alerts');
   }
-
   
   const subdirs: string[] = [];
   const regex = /href="(\d{2}\/)"/g;
@@ -121,7 +139,8 @@ export const getLatestAlerts = async (): Promise<Alert[]> => {
   }
 
   if (subdirs.length === 0) {
-    throw new Error('No subdirectories found for this region.');
+    console.log('No hourly subdirectories found for this region.');
+    return [];
   }
 
   // Sort to find the most recent hour.
@@ -137,14 +156,14 @@ export const getLatestAlerts = async (): Promise<Alert[]> => {
   }
 
   if (capFiles.length === 0) {
-    throw new Error('No CAP files found.');
+    console.log('No CAP files found in the latest subdirectory.');
+    return [];
   }
 
   // STEP 3: Filter for the single latest version of each unique alert.
   const parsedFiles = capFiles.map(parseFilename);
   const groupedByProduct: { [key: string]: ParsedFilename[] } = {};
 
-  // Group alerts by product code to handle multiple updates to the same alert.
   for (const file of parsedFiles) {
     if (!groupedByProduct[file.productCode]) {
       groupedByProduct[file.productCode] = [];
@@ -153,10 +172,8 @@ export const getLatestAlerts = async (): Promise<Alert[]> => {
   }
 
   const latestFiles: ParsedFilename[] = [];
-  // For each group, find the single most recent file.
   for (const productCode in groupedByProduct) {
     const files = groupedByProduct[productCode];
-    // Sort by timestamp then sequence number to find the absolute latest file.
     files.sort((a, b) => {
       if (b.timestamp !== a.timestamp) {
         return b.timestamp.localeCompare(a.timestamp);
@@ -167,63 +184,68 @@ export const getLatestAlerts = async (): Promise<Alert[]> => {
   }
 
   // STEP 4: Fetch and parse the content for each of the final alert files.
-  const allAlerts: Alert[] = [];
-  for (const cap of latestFiles) {
+  const allAlertsPromises = latestFiles.map(async (cap) => {
     const capUrl = `${subdirUrl}${cap.filename}`;
-
     const capResponse = await axios.get(capUrl);
     const xmlData = capResponse.data;
-
-    // Convert the raw XML data into a JSON object.
-    const parser = new XMLParser({
-      ignoreAttributes: false,
-      attributeNamePrefix: '',
-    });
+    const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '' });
     const jsonData: { alert: CapAlert } = parser.parse(xmlData);
-
+    
     // Log the CAP file name
     console.log('CAP File Name:', cap.filename);
 
-    // A CAP alert can have one <info> block (object) or many (array).
     const alertData = jsonData.alert || {};
     let infos = alertData.info || [];
     if (!Array.isArray(infos)) {
       infos = infos ? [infos] : [];
     }
 
-    // Map each info block to the app's clean `Alert` interface.
-    const parsed = infos.map((info: CapInfo, idx: number): Alert => {
-      const areaDescValue = parseAreaDesc(info.area);
-      return {
-        id: `${alertData.identifier ?? cap.filename}-${idx}`,
-        title: info.headline ?? 'N/A',
-        summary: info.description ?? 'N/A',
-        event: info.event ?? 'N/A',
-        severity: info.severity ?? 'N/A',
-        areaDesc: areaDescValue,
-        productCode: cap.productCode,
-        published: alertData.sent ?? 'N/A',
-        region: region,
-      };
-    });
+    const parsed = infos
+      .filter(info => info.language === 'en-CA') // Only process English alerts
+      .map((info: CapInfo, idx: number): Alert => {
+        const areaDescValue = parseAreaDesc(info.area);
+        const polygonValue = getFirstPolygon(info.area);
+        const instructionText = typeof info.instruction === 'string' ? info.instruction : 'No instructions provided.';
 
-    // Log the alert info for each parsed alert
-    parsed.forEach(alert => {
-      console.log('Alert Info:', {
-        id: alert.id,
-        title: alert.title,
-        summary: alert.summary,
-        event: alert.event,
-        severity: alert.severity,
-        areaDesc: alert.areaDesc,
-        productCode: alert.productCode,
-        published: alert.published,
-        region: alert.region,
+        const alertObject: Alert = {
+          id: `${alertData.identifier ?? cap.filename}-${idx}`,
+          title: info.headline ?? 'N/A',
+          summary: info.description ?? 'N/A',
+          event: info.event ?? 'N/A',
+          severity: info.severity ?? 'N/A',
+          areaDesc: areaDescValue,
+          productCode: cap.productCode,
+          published: alertData.sent ?? 'N/A',
+          region: region,
+          headline: info.headline ?? 'N/A',
+          description: info.description ?? 'N/A',
+          instruction: instructionText,
+          polygon: polygonValue,
+        };
+
+        // Log the alert info for each parsed alert
+        console.log('Alert Info:', {
+          id: alertObject.id,
+          title: alertObject.title,
+          summary: alertObject.summary,
+          event: alertObject.event,
+          severity: alertObject.severity,
+          areaDesc: alertObject.areaDesc,
+          productCode: alertObject.productCode,
+          published: alertObject.published,
+          region: alertObject.region,
+        });
+        
+        return alertObject;
       });
-    });
+      
+    return parsed;
+  });
 
-    allAlerts.push(...parsed);
-  }
-
-  return allAlerts;
+  const nestedAlerts = await Promise.all(allAlertsPromises);
+  const allAlerts = nestedAlerts.flat();
+  
+  const twentyFourHoursAgo = new Date().getTime() - 24 * 60 * 60 * 1000;
+  return allAlerts.filter(alert => new Date(alert.published).getTime() >= twentyFourHoursAgo);
 };
+
