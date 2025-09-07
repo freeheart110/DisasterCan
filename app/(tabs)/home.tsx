@@ -59,7 +59,7 @@ export default function HomeScreen(): React.JSX.Element {
             <Text style={styles.debugText}>Lat: {locationInfo.latitude.toFixed(4)}</Text>
             <Text style={styles.debugText}>Lon: {locationInfo.longitude.toFixed(4)}</Text>
             {/* Display the full address string from the geocoder */}
-            <Text style={styles.debugText}>Address: {locationInfo.addressString}</Text>
+            <Text style={styles.debugText}>Address: {locationInfo.fullAddress}</Text>
             <Text style={styles.debugText}>Alert Region Code: {locationInfo.regionCode}</Text>
           </View>
         )}

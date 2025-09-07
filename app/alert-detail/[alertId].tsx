@@ -5,13 +5,17 @@ import { useAlerts } from '../../src/hooks/useAlerts';
 import MapView, { Polygon } from 'react-native-maps';
 import { getPolygonCenter, parsePolygon } from '../../src/utils/mapUtils';
 
+/**
+ * A screen that displays the full details of a single selected alert,
+ * including a map of the affected area if polygon data is available.
+ */
 export default function AlertDetailScreen(): React.JSX.Element {
-  // Get the dynamic part of the URL (the alert's ID) using a hook from Expo Router.
+  // Get the alertId from the URL parameters passed by the Link component.
   const { alertId } = useLocalSearchParams();
-  // Fetch the global state of all alerts and the current loading status.
+  // Access the global list of alerts and loading state.
   const { alerts, loading } = useAlerts();
 
-  // Show a loading spinner while the alerts are being fetched.
+  // Show a loading indicator while the main alerts are still being fetched.
   if (loading) {
     return (
       <View style={styles.centered}>
@@ -20,10 +24,10 @@ export default function AlertDetailScreen(): React.JSX.Element {
     );
   }
 
-  // Find the specific alert that matches the ID from the URL.
+  // Find the specific alert from the global list using the ID from the URL.
   const alert = alerts.find(a => a.id === alertId);
 
-  // If no matching alert is found, display an error message.
+  // If the alert isn't found (e.g., due to an invalid ID), show an error message.
   if (!alert) {
     return (
       <View style={styles.centered}>
@@ -32,30 +36,36 @@ export default function AlertDetailScreen(): React.JSX.Element {
     );
   }
 
-  // Parse the polygon string into an array of coordinates for the map.
-  // If no polygon exists, default to an empty array.
-  const polygonCoords = alert.polygon ? parsePolygon(alert.polygon) : [];
-  // Calculate the map's initial center and zoom level based on the polygon.
-  const initialRegion = alert.polygon ? getPolygonCenter(polygonCoords) : null;
+  // An alert can have multiple polygons. Parse all of them to draw on the map.
+  const allPolygonCoords = alert.polygons ? alert.polygons.flatMap(p => parsePolygon(p)) : [];
+  // Calculate the initial map region that encompasses all polygons.
+  const initialRegion = allPolygonCoords.length > 0 ? getPolygonCenter(allPolygonCoords) : null;
+  // ---------------------
 
   return (
     <ScrollView style={styles.container}>
-      {/* Set the title of the screen in the header to the alert's event type. */}
+      {/* Set the screen's header title to the alert's event type. */}
       <Stack.Screen options={{ title: alert.event }} />
 
-      {/* Only render the MapView if there is a polygon to display. */}
+      {/* Only render the MapView if there is a valid region to display. */}
       {initialRegion && (
         <MapView style={styles.map} initialRegion={initialRegion}>
-          <Polygon
-            coordinates={polygonCoords}
-            strokeColor="#FF0000" // Red outline for the polygon
-            fillColor="rgba(255, 0, 0, 0.3)" // Semi-transparent red fill
-            strokeWidth={2}
-          />
+          {/* Loop through and render each polygon associated with the alert. */}
+          {alert.polygons?.map((polygonString, index) => {
+            const polygonCoords = parsePolygon(polygonString);
+            return (
+              <Polygon
+                key={index}
+                coordinates={polygonCoords}
+                strokeColor="#FF0000"
+                fillColor="rgba(255, 0, 0, 0.3)"
+                strokeWidth={2}
+              />
+            );
+          })}
         </MapView>
       )}
 
-      {/* Container for all the textual information about the alert. */}
       <View style={styles.contentContainer}>
         <Text style={styles.headline}>{alert.headline}</Text>
 
@@ -77,7 +87,7 @@ export default function AlertDetailScreen(): React.JSX.Element {
   );
 }
 
-// Stylesheet for the component.
+// Stylesheet for the components on this screen.
 const styles = StyleSheet.create({
   container: {
     flex: 1,
