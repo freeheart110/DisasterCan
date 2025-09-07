@@ -1,9 +1,11 @@
 import axios from 'axios';
 import { XMLParser } from 'fast-xml-parser';
-import * as Location from 'expo-location';
+// Import the dedicated location service to get the region code
+import { getLocationInfo } from './locationService';
 
 // --- TYPE DEFINITIONS ---
 
+// This is the main, clean interface for an alert used throughout the app.
 export interface Alert {
   id: string;
   title: string;
@@ -17,25 +19,26 @@ export interface Alert {
   headline: string;
   description: string;
   instruction: string;
-  polygon?: string; // A polygon might not exist for every alert
-}
-
-// A specific type for the <area> block in a CAP file.
-interface CapArea {
-  areaDesc?: string;
   polygon?: string;
 }
 
-// A specific type for the <info> block in a CAP file.
+// These are internal types used only for parsing the raw XML data.
+// They are more complex to account for the nested and sometimes inconsistent structure of the CAP file.
+interface CapArea {
+  areaDesc?: string;
+  polygon?: string;
+  // ... other potential fields
+}
+
 interface CapInfo {
-  language?: string;
   area?: CapArea[] | CapArea;
   headline?: string;
   description?: string;
-  instruction?: unknown; // Use 'unknown' to force a type check later
+  instruction?: string | {}; // Can be an empty object if tag exists but is empty
   event?: string;
   severity?: string;
-  [key: string]: unknown; // Allow extra fields from XML
+  // Allow any other fields from the XML
+  [key: string]: unknown;
 }
 
 interface CapAlert {
@@ -58,79 +61,47 @@ const getAlertBaseUrl = (region: string): string => {
   return `https://dd.weather.gc.ca/alerts/cap/${today}/${region}/`;
 };
 
-// The `area` can be either a single object or an array of objects.
 const parseAreaDesc = (area: CapInfo['area']): string => {
   if (!area) return 'N/A';
-  if (Array.isArray(area)) {
-    return area.map((a: CapArea) => a.areaDesc ?? 'N/A').join(', ');
-  }
-  return (area as CapArea).areaDesc ?? 'N/A';
+  const areas = Array.isArray(area) ? area : [area];
+  return areas.map(a => a.areaDesc ?? 'N/A').join(', ');
 };
 
 const getFirstPolygon = (area: CapInfo['area']): string | undefined => {
   if (!area) return undefined;
-  if (Array.isArray(area)) {
-    return area[0]?.polygon;
-  }
-  return (area as CapArea).polygon;
+  const firstArea = Array.isArray(area) ? area[0] : area;
+  return firstArea?.polygon;
 };
 
 const parseFilename = (filename: string): ParsedFilename => {
   const parts = filename.split('_');
-  const productCode = parts[1];
-  const timestamp = parts[4];
-  const sequence = parseInt(parts[5].replace('.cap', ''), 10);
+  const productCode = parts.length > 1 ? parts[1] : 'N/A';
+  const timestamp = parts.length > 4 ? parts[4] : 'N/A';
+  const sequence = parts.length > 5 ? parseInt(parts[5].replace('.cap', ''), 10) : 0;
   return { filename, productCode, timestamp, sequence };
-};
-
-// Map coordinates to Environment Canada regions
-const getRegionFromLocation = async (): Promise<string> => {
-  const { status } = await Location.requestForegroundPermissionsAsync();
-  if (status !== 'granted') {
-    throw new Error('Permission to access location was denied');
-  }
-
-  const loc = await Location.getCurrentPositionAsync({});
-  const lat = loc.coords.latitude;
-  const lon = loc.coords.longitude;
-
-  // Log GPS location
-  console.log('GPS Location:', { latitude: lat, longitude: lon });
-
-  if (lat >= 60) return 'CWNT'; // Territories
-  if (lon <= -120) return 'CWVR'; // BC
-  if (lon > -120 && lon <= -95) return 'CWWG'; // Prairies provinces (includes Alberta, Sask, Manitoba)
-  if (lon > -95 && lon <= -80) return 'CWTO'; // Ontario
-  if (lon > -80 && lon <= -67) return 'CWUL'; // Quebec
-  if (lon > -67) return 'CWHX'; // Atlantic
-  return 'CWTO';
 };
 
 // --- MAIN WORKFLOW ---
 
 export const getLatestAlerts = async (): Promise<Alert[]> => {
-  const region = await getRegionFromLocation();
+  // 1. Get location info from the single source of truth: locationService.ts.
+  const locationInfo = await getLocationInfo();
+  const region = locationInfo.regionCode;
 
-  // Log region code
-  console.log('Region Code:', region);
-
-  // STEP 1: Find the latest hourly subdirectory for today's alerts.
+  // 2. Find the latest hourly subdirectory for today's alerts.
   const ALERT_BASE_URL = getAlertBaseUrl(region);
-  
+
   let dirResponse;
   try {
-    // Try to fetch the list of hourly subdirectories for today.
     dirResponse = await axios.get(ALERT_BASE_URL);
   } catch (error) {
     if (axios.isAxiosError(error) && error.response?.status === 404) {
       console.log(`No alert directory found for region ${region} today.`);
       return []; // Return an empty array, not an error.
     }
-    // Throw any other type of error.
-    console.error('Failed to get latest alerts:', error);
-    throw new Error('Failed to fetch alerts');
+    throw error; // Re-throw other errors
   }
-  
+
   const subdirs: string[] = [];
   const regex = /href="(\d{2}\/)"/g;
   let match: RegExpExecArray | null;
@@ -143,11 +114,10 @@ export const getLatestAlerts = async (): Promise<Alert[]> => {
     return [];
   }
 
-  // Sort to find the most recent hour.
   const latestSubdir = subdirs.sort().reverse()[0];
   const subdirUrl = `${ALERT_BASE_URL}${latestSubdir}`;
 
-  // STEP 2: Get all .cap filenames from the latest hourly directory.
+  // 3. Get all .cap filenames from the latest hourly directory.
   const subdirResponse = await axios.get(subdirUrl);
   const capFiles: string[] = [];
   const capRegex = /href="([^"]*\.cap)"/g;
@@ -160,10 +130,9 @@ export const getLatestAlerts = async (): Promise<Alert[]> => {
     return [];
   }
 
-  // STEP 3: Filter for the single latest version of each unique alert.
+  // 4. Filter for the single latest version of each unique alert.
   const parsedFiles = capFiles.map(parseFilename);
   const groupedByProduct: { [key: string]: ParsedFilename[] } = {};
-
   for (const file of parsedFiles) {
     if (!groupedByProduct[file.productCode]) {
       groupedByProduct[file.productCode] = [];
@@ -183,69 +152,58 @@ export const getLatestAlerts = async (): Promise<Alert[]> => {
     latestFiles.push(files[0]);
   }
 
-  // STEP 4: Fetch and parse the content for each of the final alert files.
-  const allAlertsPromises = latestFiles.map(async (cap) => {
+  // 5. Fetch and parse the content for each of the final alert files.
+  const allAlerts: Alert[] = [];
+  for (const cap of latestFiles) {
     const capUrl = `${subdirUrl}${cap.filename}`;
+
     const capResponse = await axios.get(capUrl);
     const xmlData = capResponse.data;
-    const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '' });
+
+    const parser = new XMLParser({
+      ignoreAttributes: false,
+      attributeNamePrefix: '',
+    });
     const jsonData: { alert: CapAlert } = parser.parse(xmlData);
-    
-    // Log the CAP file name
-    console.log('CAP File Name:', cap.filename);
 
     const alertData = jsonData.alert || {};
     let infos = alertData.info || [];
     if (!Array.isArray(infos)) {
       infos = infos ? [infos] : [];
     }
+    
+    // Filter for English language alerts to avoid duplicates
+    const englishInfos = infos.filter(info => info.language === 'en-CA');
 
-    const parsed = infos
-      .filter(info => info.language === 'en-CA') // Only process English alerts
-      .map((info: CapInfo, idx: number): Alert => {
-        const areaDescValue = parseAreaDesc(info.area);
-        const polygonValue = getFirstPolygon(info.area);
-        const instructionText = typeof info.instruction === 'string' ? info.instruction : 'No instructions provided.';
-
-        const alertObject: Alert = {
-          id: `${alertData.identifier ?? cap.filename}-${idx}`,
-          title: info.headline ?? 'N/A',
-          summary: info.description ?? 'N/A',
-          event: info.event ?? 'N/A',
-          severity: info.severity ?? 'N/A',
-          areaDesc: areaDescValue,
-          productCode: cap.productCode,
-          published: alertData.sent ?? 'N/A',
-          region: region,
-          headline: info.headline ?? 'N/A',
-          description: info.description ?? 'N/A',
-          instruction: instructionText,
-          polygon: polygonValue,
-        };
-
-        // Log the alert info for each parsed alert
-        console.log('Alert Info:', {
-          id: alertObject.id,
-          title: alertObject.title,
-          summary: alertObject.summary,
-          event: alertObject.event,
-          severity: alertObject.severity,
-          areaDesc: alertObject.areaDesc,
-          productCode: alertObject.productCode,
-          published: alertObject.published,
-          region: alertObject.region,
-        });
-        
-        return alertObject;
-      });
+    const parsed = englishInfos.map((info: CapInfo, idx: number): Alert => {
+      const areaDescValue = parseAreaDesc(info.area);
+      const polygonValue = getFirstPolygon(info.area);
       
-    return parsed;
-  });
+      // Handle cases where instruction might be an empty object
+      const instructionText = (typeof info.instruction === 'string' && info.instruction)
+        ? info.instruction
+        : 'No instructions provided.';
 
-  const nestedAlerts = await Promise.all(allAlertsPromises);
-  const allAlerts = nestedAlerts.flat();
-  
-  const twentyFourHoursAgo = new Date().getTime() - 24 * 60 * 60 * 1000;
-  return allAlerts.filter(alert => new Date(alert.published).getTime() >= twentyFourHoursAgo);
+      return {
+        id: `${alertData.identifier ?? cap.filename}-${idx}`,
+        title: info.headline ?? 'N/A',
+        summary: info.description ?? 'N/A',
+        event: info.event ?? 'N/A',
+        severity: info.severity ?? 'N/A',
+        areaDesc: areaDescValue,
+        productCode: cap.productCode,
+        published: alertData.sent ?? 'N/A',
+        region: region,
+        headline: info.headline ?? 'N/A',
+        description: info.description ?? 'N/A',
+        instruction: instructionText,
+        polygon: polygonValue,
+      };
+    });
+
+    allAlerts.push(...parsed);
+  }
+
+  return allAlerts;
 };
 
