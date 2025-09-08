@@ -6,7 +6,7 @@ _Gamified disaster-preparedness for Canadians – built with Expo + React Native
 
 ```bash
 # Clone & install
-git clone git@github.com:<YOUR_USER>/disastercan.git
+git clone git@github.com:freeheart110/disastercan.git
 cd disastercan
 npm install
 

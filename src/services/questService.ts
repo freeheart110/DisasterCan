@@ -12,9 +12,9 @@ import type { Quest } from '../constants/quests/types';
  * @returns A promise that resolves to an array of Quest objects.
  */
 export const loadCommonQuests = async (): Promise<Quest[]> => {
-  // For now, we will just return a static list of all common quests.
+  // For now, return a static list of all common quests.
   const commonQuests = [seventyTwoHourKitQuest, familyPlanQuest];
   
-  // We can add the dynamic, location-based logic back in later.
+  // Add the dynamic, location-based logic back in later.
   return commonQuests;
 };
