@@ -217,7 +217,7 @@ export const getLatestAlerts = async (): Promise<Alert[]> => {
     // If NO polygon data, fall back to a text-based check of the area description.
     const userCity = locationInfo.city;
     if (!userCity) {
-      // If for some reason we couldn't get a city name, exclude the alert to be safe.
+      // If no city name is given, exclude the alert to be safe.
       console.log(`Excluding broad alert (no city info to check): ${alert.headline}`);
       return false;
     }
