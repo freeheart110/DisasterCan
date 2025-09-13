@@ -1,18 +1,19 @@
 import { Stack } from 'expo-router';
 import React, { useEffect } from 'react';
 import { useQuestStore } from '../src/state/questStore';
-import * as Notifications from 'expo-notifications';
-import { registerBackgroundTaskAsync } from '../src/services/notificationService';
+// import * as Notifications from 'expo-notifications'; 
+// import { registerBackgroundTaskAsync } from '../src/services/notificationService'; 
 
-// Configure how notifications are handled when the app is in the foreground.
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowBanner: true,   // Show as a banner (iOS)
-    shouldShowList: true,     // Add to notification center list (iOS)
-    shouldPlaySound: false,   // Set to true for sound for foreground notifications
-    shouldSetBadge: false,    // No app icon badge updates
-  }),
-});
+// --- Temporarily disabled for Expo Go development ---
+// Notifications.setNotificationHandler({
+//   handleNotification: async () => ({
+//     shouldShowBanner: true,
+//     shouldShowList: true,
+//     shouldPlaySound: false,
+//     shouldSetBadge: false,
+//   }),
+// });
+// ----------------------------------------------------
 
 export default function RootLayout() {
   const initializeQuests = useQuestStore((state) => state.initializeQuests);
@@ -21,8 +22,11 @@ export default function RootLayout() {
   useEffect(() => {
     // Initialize the gamified quests from the store.
     initializeQuests();
-    // Register the background task that will periodically check for new alerts.
-    registerBackgroundTaskAsync();
+
+    // --- Temporarily disabled for Expo Go development ---
+    // registerBackgroundTaskAsync();
+    // ----------------------------------------------------
+
   }, [initializeQuests]); // The dependency array ensures this runs only once.
 
   return (
@@ -39,3 +43,4 @@ export default function RootLayout() {
     </Stack>
   );
 }
+
