@@ -188,6 +188,8 @@ export const getLatestAlerts = async (): Promise<Alert[]> => {
     allAlerts.push(...parsed);
   }
 
+  // --- Start of commented out section ---
+  /*
   // STEP 6: Apply precision geofencing to filter alerts to the user's exact location.
   const userLocation = {
     latitude: locationInfo.latitude,
@@ -213,7 +215,6 @@ export const getLatestAlerts = async (): Promise<Alert[]> => {
       return isInside;
     }
 
-    // --- NEW LOGIC ---
     // If NO polygon data, fall back to a text-based check of the area description.
     const userCity = locationInfo.city;
     if (!userCity) {
@@ -239,5 +240,11 @@ export const getLatestAlerts = async (): Promise<Alert[]> => {
   console.log(`Found ${allAlerts.length} total alerts, and after filtering, ${relevantAlerts.length} are relevant to your location.`);
 
   return relevantAlerts;
+  */
+  // --- End of commented out section ---
+  
+  // STEP 6: Return all alerts for the region without any location-specific filtering.
+  // The strict geofencing has been temporarily disabled to show all regional alerts.
+  return allAlerts;
 };
 
