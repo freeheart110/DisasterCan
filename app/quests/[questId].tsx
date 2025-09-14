@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, SafeAreaView, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuestStore } from '../../src/state/questStore';
@@ -38,6 +39,9 @@ export default function QuestDetailScreen(): React.JSX.Element {
     return <ActivityIndicator style={{ flex: 1 }} />;
   }
 
+  console.log("questId from URL:", questId);
+  console.log("quests in store:", quests.map(q => q.id));
+  
   if (!quest) {
     return (
       <SafeAreaView style={styles.safeArea}>

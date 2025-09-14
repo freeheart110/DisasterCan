@@ -5,9 +5,16 @@
  * Note: The event keys (e.g., 'wildfire') should be lowercase to match the parsed CAP data.
  */
 
-export const alertToQuestMap: Record<string, string> = {
-  'wildfire': 'hazard-wildfire-1',
-  // Future mappings can be added here
-  // 'flood': 'hazard-flood-1',
-  // 'thunderstorm': 'hazard-storm-1',
+export const alertQuestMap: Record<string, string> = {
+  'blizzard': 'hazard-blizzard-1',
+  'winter storm': 'hazard-blizzard-1',
+  'earthquake': 'hazard-earthquake-1',
+  'flood': 'hazard-flood-1',
+
+  'heat warning': 'hazard-heatwave-1',
+  'hurricane': 'hazard-hurricane-1',
+  'tornado': 'hazard-tornado-1',
+  'wildfire': 'hazard-wildfire-1', 
+  'air quality': 'hazard-wildfire-smoke-1', 
 };
+

@@ -2,26 +2,29 @@ import { View, Text, FlatList, StyleSheet, TouchableOpacity, ActivityIndicator }
 import { useAlerts } from '../../src/hooks/useAlerts';
 import { Link } from 'expo-router';
 import type { Alert } from '../../src/services/alertService';
-import { alertToQuestMap } from '../../src/constants/quests/alertQuestMap';
+import { alertQuestMap } from '../../src/constants/quests/alertQuestMap';
 
 /**
  * A reusable UI component to display a summary of a single alert.
- * Now includes a conditional button to link to a relevant preparedness quest.
+ * It now includes a conditional "Prepare" button if a relevant quest exists.
  */
 const AlertCard = ({ item }: { item: Alert }) => {
-  // Check if there is a quest associated with this alert's event type.
-  const relevantQuestId = alertToQuestMap[item.event.toLowerCase()];
+  // Check the map to see if there is a quest associated with this alert's event type.
+  const questId = alertQuestMap[item.event.toLowerCase()];
 
   return (
     <View style={styles.alertCard}>
-      <Text style={styles.event}>{item.event}</Text>
-      <Text style={styles.title}>{item.headline}</Text>
-      <Text style={styles.detail}>Severity: {item.severity}</Text>
-      <Text style={styles.detail}>Area: {item.areaDesc}</Text>
-
-      {/* If a relevant quest exists, display the "Prepare Now" button. */}
-      {relevantQuestId && (
-        <Link href={`/quests/${relevantQuestId}`} asChild>
+      <Link href={`/alert-detail/${item.id}`} asChild>
+        <TouchableOpacity style={styles.alertContent}>
+          <Text style={styles.event}>{item.event}</Text>
+          <Text style={styles.title}>{item.headline}</Text>
+          <Text style={styles.detail}>Severity: {item.severity}</Text>
+          <Text style={styles.detail}>Area: {item.areaDesc}</Text>
+        </TouchableOpacity>
+      </Link>
+      {/* Conditionally render the "Prepare" button if a matching quest was found. */}
+      {questId && (
+        <Link href={`/quests/${questId}`} asChild>
           <TouchableOpacity style={styles.prepareButton}>
             <Text style={styles.prepareButtonText}>Prepare Now</Text>
           </TouchableOpacity>
@@ -59,19 +62,12 @@ export default function AlertsScreen(): React.JSX.Element {
 
   return (
     <View style={styles.container}>
+      {/* Renders a list of alert cards. */}
       <FlatList
         data={alerts}
         keyExtractor={item => item.id}
-        renderItem={({ item }) => (
-          // The Link component now navigates to the alert detail screen.
-          // The "Prepare Now" button inside the card handles navigation to the quest.
-          <Link href={`/alert-detail/${item.id}`} asChild>
-            <TouchableOpacity>
-              <AlertCard item={item} />
-            </TouchableOpacity>
-          </Link>
-        )}
-        // Display a message if there are no active alerts.
+        renderItem={({ item }) => <AlertCard item={item} />}
+        // Displays a message if there are no active alerts.
         ListEmptyComponent={
           <View style={styles.centered}>
             <Text>No active alerts</Text>
@@ -97,13 +93,15 @@ const styles = StyleSheet.create({
   },
   alertCard: { 
     backgroundColor: '#fff', 
-    padding: 16, 
-    marginBottom: 16, 
     borderRadius: 8, 
+    marginBottom: 16, 
     shadowColor: '#000', 
     shadowOpacity: 0.1, 
     shadowRadius: 4, 
     elevation: 3 
+  },
+  alertContent: {
+    padding: 16,
   },
   event: { 
     fontSize: 18, 
@@ -120,18 +118,16 @@ const styles = StyleSheet.create({
     color: '#666', 
     marginTop: 4 
   },
-  // New styles for the "Prepare Now" button
   prepareButton: {
     backgroundColor: '#007AFF',
-    paddingVertical: 10,
-    borderRadius: 6,
-    marginTop: 12,
-    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomLeftRadius: 8,
+    borderBottomRightRadius: 8,
   },
   prepareButtonText: {
     color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+    textAlign: 'center',
+    fontWeight: 'bold',
   },
 });
 

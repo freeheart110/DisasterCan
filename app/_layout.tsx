@@ -1,33 +1,25 @@
 import { Stack } from 'expo-router';
 import React, { useEffect } from 'react';
 import { useQuestStore } from '../src/state/questStore';
-// import * as Notifications from 'expo-notifications'; 
-// import { registerBackgroundTaskAsync } from '../src/services/notificationService'; 
+import { useLocations } from '../src/hooks/useLocations'; 
 
-// --- Temporarily disabled for Expo Go development ---
-// Notifications.setNotificationHandler({
-//   handleNotification: async () => ({
-//     shouldShowBanner: true,
-//     shouldShowList: true,
-//     shouldPlaySound: false,
-//     shouldSetBadge: false,
-//   }),
-// });
-// ----------------------------------------------------
+// --- Notification code is disabled for Expo Go development ---
 
 export default function RootLayout() {
   const initializeQuests = useQuestStore((state) => state.initializeQuests);
+  // Get the user's location information when the app starts.
+  const { locationInfo } = useLocations();
 
-  // This effect hook runs once when the application starts.
+  // This effect hook runs when the app starts and whenever locationInfo changes.
   useEffect(() => {
-    // Initialize the gamified quests from the store.
-    initializeQuests();
-
-    // --- Temporarily disabled for Expo Go development ---
-    // registerBackgroundTaskAsync();
-    // ----------------------------------------------------
-
-  }, [initializeQuests]); // The dependency array ensures this runs only once.
+    // Wait until the user's location has been successfully determined.
+    if (locationInfo?.province) {
+      console.log("Detected province code:", locationInfo.province);
+      // Once we have the province, initialize the quest store with it.
+      // This will load both common quests and the correct regional quests.
+      initializeQuests(locationInfo.province);
+    }
+  }, [locationInfo, initializeQuests]); // This runs when location is found.
 
   return (
     // The Stack navigator is the root of the app's navigation.

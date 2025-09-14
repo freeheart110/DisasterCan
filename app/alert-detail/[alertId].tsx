@@ -1,21 +1,34 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { Stack, useLocalSearchParams, Link } from 'expo-router';
 import { useAlerts } from '../../src/hooks/useAlerts';
-import MapView, { Polygon } from 'react-native-maps';
+import MapView, { Polygon, Region } from 'react-native-maps';
 import { getPolygonCenter, parsePolygon } from '../../src/utils/mapUtils';
+import { alertQuestMap } from '../../src/constants/quests/alertQuestMap';
 
 /**
- * A screen that displays the full details of a single selected alert,
- * including a map of the affected area if polygon data is available.
+ * A reusable component for the "Prepare" button in the header.
+ * @param {string} questId - The ID of the quest to navigate to.
+ */
+const PrepareButton = ({ questId }: { questId: string }) => (
+  <Link href={`/quests/${questId}`} asChild>
+    <TouchableOpacity style={{ marginRight: 10 }}>
+      <Text style={{ color: '#007AFF', fontSize: 16 }}>Prepare</Text>
+    </TouchableOpacity>
+  </Link>
+);
+
+/**
+ * Renders the detailed view for a single emergency alert, including a map of the
+ * affected area if polygon data is available.
  */
 export default function AlertDetailScreen(): React.JSX.Element {
-  // Get the alertId from the URL parameters passed by the Link component.
+  // Get the alertId from the URL, which is passed from the alerts list screen.
   const { alertId } = useLocalSearchParams();
-  // Access the global list of alerts and loading state.
+  // Fetch the global list of all alerts and the loading state.
   const { alerts, loading } = useAlerts();
 
-  // Show a loading indicator while the main alerts are still being fetched.
+  // Display a loading indicator while the main alert data is being fetched.
   if (loading) {
     return (
       <View style={styles.centered}>
@@ -24,10 +37,10 @@ export default function AlertDetailScreen(): React.JSX.Element {
     );
   }
 
-  // Find the specific alert from the global list using the ID from the URL.
+  // Find the specific alert from the global list using the alertId.
   const alert = alerts.find(a => a.id === alertId);
 
-  // If the alert isn't found (e.g., due to an invalid ID), show an error message.
+  // Handle the case where the alert might not be found (e.g., if it has expired).
   if (!alert) {
     return (
       <View style={styles.centered}>
@@ -35,37 +48,42 @@ export default function AlertDetailScreen(): React.JSX.Element {
       </View>
     );
   }
+  
+  // Check the map to see if a quest is associated with this alert's event type.
+  const questId = alertQuestMap[alert.event.toLowerCase()];
 
-  // An alert can have multiple polygons. Parse all of them to draw on the map.
-  const allPolygonCoords = alert.polygons ? alert.polygons.flatMap(p => parsePolygon(p)) : [];
-  // Calculate the initial map region that encompasses all polygons.
-  const initialRegion = allPolygonCoords.length > 0 ? getPolygonCenter(allPolygonCoords) : null;
-  // ---------------------
+  // Parse all polygon strings into a single array of coordinates for the map view.
+  const allPolygonCoords = alert.polygons?.flatMap(p => parsePolygon(p)) ?? [];
+  // Calculate the center and zoom level for the map.
+  const initialRegion: Region | null = allPolygonCoords.length > 0 ? getPolygonCenter(allPolygonCoords) : null;
 
   return (
     <ScrollView style={styles.container}>
-      {/* Set the screen's header title to the alert's event type. */}
-      <Stack.Screen options={{ title: alert.event }} />
+      {/* Configure the header of the screen, dynamically setting the title and the "Prepare" button. */}
+      <Stack.Screen 
+        options={{ 
+          title: alert.event,
+          headerRight: () => questId ? <PrepareButton questId={questId} /> : null,
+        }} 
+      />
 
-      {/* Only render the MapView if there is a valid region to display. */}
+      {/* If the alert has a polygon, render the map view. */}
       {initialRegion && (
         <MapView style={styles.map} initialRegion={initialRegion}>
-          {/* Loop through and render each polygon associated with the alert. */}
-          {alert.polygons?.map((polygonString, index) => {
-            const polygonCoords = parsePolygon(polygonString);
-            return (
-              <Polygon
-                key={index}
-                coordinates={polygonCoords}
-                strokeColor="#FF0000"
-                fillColor="rgba(255, 0, 0, 0.3)"
-                strokeWidth={2}
-              />
-            );
-          })}
+          {/* Loop through each polygon string and render it on the map. */}
+          {alert.polygons?.map((polygonString, index) => (
+            <Polygon
+              key={index}
+              coordinates={parsePolygon(polygonString)}
+              strokeColor="#FF0000"
+              fillColor="rgba(255, 0, 0, 0.3)"
+              strokeWidth={2}
+            />
+          ))}
         </MapView>
       )}
 
+      {/* Container for the textual alert information. */}
       <View style={styles.contentContainer}>
         <Text style={styles.headline}>{alert.headline}</Text>
 
@@ -73,7 +91,7 @@ export default function AlertDetailScreen(): React.JSX.Element {
           <Text style={styles.sectionTitle}>Description</Text>
           <Text style={styles.bodyText}>{alert.description}</Text>
           
-          {/* Conditionally render the Instructions section only if instruction text exists. */}
+          {/* Only render the Instructions section if there are instructions provided. */}
           {alert.instruction !== 'No instructions provided.' && (
             <>
               <Text style={styles.sectionTitle}>Instructions</Text>
@@ -87,7 +105,6 @@ export default function AlertDetailScreen(): React.JSX.Element {
   );
 }
 
-// Stylesheet for the components on this screen.
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -109,6 +126,7 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 16,
+    textTransform: 'capitalize',
   },
   detailSection: {
     marginBottom: 16,
