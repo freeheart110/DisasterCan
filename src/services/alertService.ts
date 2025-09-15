@@ -1,9 +1,9 @@
 import axios from 'axios';
 import { XMLParser } from 'fast-xml-parser';
 import { getLocationInfo } from './locationService';
-import { parsePolygon } from '../utils/mapUtils';
 
-// Types for UI-facing alert data
+// --- TYPE DEFINITIONS ---
+
 export interface AlertVersion {
   headline: string;
   description: string;
@@ -14,23 +14,22 @@ export interface AlertVersion {
 
 export interface Alert {
   id: string;
-  title: string;
-  summary: string;
   event: string;
-  severity: string;
-  areaDesc: string;
   productCode: string;
-  published: string;
   region: string;
   headline: string;
+  published: string;
+  severity: string;
   description: string;
   instruction: string;
+  areaDesc: string;
   polygons?: string[];
   versions: AlertVersion[];
   isActive: boolean;
 }
 
-// Internal CAP structures
+// --- INTERNAL STRUCTURES FOR XML PARSING ---
+
 interface CapArea {
   areaDesc?: string;
   polygon?: string;
@@ -44,24 +43,13 @@ interface CapInfo {
   event?: string;
   severity?: string;
   language?: string;
-  expires?: string;
+  parameter?: { valueName: string; value: string }[];
 }
 
 interface CapAlert {
   identifier?: string;
   sent?: string;
   info?: CapInfo | CapInfo[];
-}
-
-interface CapMetadata {
-  Alert_Location_Status: {
-    value: 'active' | 'ended';
-  };
-}
-
-interface CapEntry {
-  alert: CapAlert;
-  metadata: CapMetadata;
 }
 
 interface ParsedFilename {
@@ -71,11 +59,7 @@ interface ParsedFilename {
   sequence: number;
 }
 
-// Helpers
-const getAlertBaseUrl = (region: string): string => {
-  const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-  return `https://dd.weather.gc.ca/alerts/cap/${today}/${region}/`;
-};
+// --- UTILITY HELPERS ---
 
 const parseAreaDesc = (area: CapInfo['area']): string => {
   if (!area) return 'N/A';
@@ -97,123 +81,126 @@ const parseFilename = (filename: string): ParsedFilename => {
   return { filename, productCode, timestamp, sequence };
 };
 
-// Main function
+// --- MAIN FUNCTION ---
+
 export const getLatestAlerts = async (): Promise<Alert[]> => {
   const locationInfo = await getLocationInfo();
   const region = locationInfo.regionCode;
-  const ALERT_BASE_URL = getAlertBaseUrl(region);
+  const allCapFiles: { file: ParsedFilename, subdirUrl: string }[] = [];
 
-  // Step 1: Load directory
-  let dirResponse;
-  try {
-    dirResponse = await axios.get(ALERT_BASE_URL);
-  } catch (error) {
-    if (axios.isAxiosError(error) && error.response?.status === 404) return [];
-    throw error;
+  const now = new Date();
+  const twelveHoursAgo = new Date(now.getTime() - 12 * 60 * 60 * 1000);
+
+  const nowUtcHour = now.getUTCHours(); // current hour UTC (e.g. 19)
+  const twelveHoursAgoUtcHour = twelveHoursAgo.getUTCHours(); // start hour UTC (e.g. 7)
+  const todayUtcDate = now.toISOString().slice(0, 10).replace(/-/g, '');
+  const yesterday = new Date(now);
+  yesterday.setUTCDate(now.getUTCDate() - 1);
+  const yesterdayUtcDate = yesterday.toISOString().slice(0, 10).replace(/-/g, '');
+
+  // Create a list of {date, hour} pairs for the last 12 hours
+  const utcHoursToCheck: { date: string, baseUrl: string, hour: string }[] = [];
+
+  for (let i = 0; i < 12; i++) {
+    const checkTime = new Date(now.getTime() - i * 60 * 60 * 1000); // Subtract i hours
+    const utcDate = checkTime.toISOString().slice(0, 10).replace(/-/g, '');
+    const utcHour = checkTime.getUTCHours().toString().padStart(2, '0') + '/';
+
+    const baseUrl = utcDate === todayUtcDate
+      ? `https://dd.weather.gc.ca/alerts/cap/${utcDate}/${region}/${utcHour}`
+      : `https://dd.weather.gc.ca/yesterday/alerts/cap/${utcDate}/${region}/${utcHour}`;
+
+    utcHoursToCheck.push({ date: utcDate, baseUrl, hour: utcHour });
   }
 
-  // Step 2: Get latest subdir (hour)
-  const subdirs: string[] = [];
-  const regex = /href="(\d{2}\/)"/g;
-  let match: RegExpExecArray | null;
-  while ((match = regex.exec(dirResponse.data)) !== null) {
-    subdirs.push(match[1]);
+  // --- STEP 1: Fetch all cap files from each folder in the last 12 hours ---
+  for (const { baseUrl } of utcHoursToCheck) {
+    try {
+      const response = await axios.get(baseUrl);
+      const capRegex = /href="([^"]*\.cap)"/g;
+      let match: RegExpExecArray | null;
+      while ((match = capRegex.exec(response.data)) !== null) {
+        allCapFiles.push({
+          file: parseFilename(match[1]),
+          subdirUrl: baseUrl,
+        });
+      }
+    } catch (error) {
+      // Folder may not exist — skip silently
+      continue;
+    }
   }
 
-  if (subdirs.length === 0) return [];
-  const latestSubdir = subdirs.sort().reverse()[0];
-  const subdirUrl = `${ALERT_BASE_URL}${latestSubdir}`;
+  if (allCapFiles.length === 0) return [];
 
-  // Step 3: Get all .cap files in that hour
-  const subdirResponse = await axios.get(subdirUrl);
-  const capFiles: string[] = [];
-  const capRegex = /href="([^"]*\.cap)"/g;
-  while ((match = capRegex.exec(subdirResponse.data)) !== null) {
-    capFiles.push(match[1]);
+  // --- STEP 2: Group by product code ---
+  const groupedByProduct: { [key: string]: { file: ParsedFilename, subdirUrl: string }[] } = {};
+  for (const item of allCapFiles) {
+    if (!groupedByProduct[item.file.productCode]) {
+      groupedByProduct[item.file.productCode] = [];
+    }
+    groupedByProduct[item.file.productCode].push(item);
   }
 
-  if (capFiles.length === 0) return [];
-
-  // Step 4: Group by productCode and pick latest
-  const parsedFiles = capFiles.map(parseFilename);
-  const grouped: { [key: string]: ParsedFilename[] } = {};
-
-  for (const file of parsedFiles) {
-    if (!grouped[file.productCode]) grouped[file.productCode] = [];
-    grouped[file.productCode].push(file);
-  }
-
-  const latestFiles: ParsedFilename[] = [];
-
-  for (const productCode in grouped) {
-    const files = grouped[productCode];
-    files.sort((a, b) => {
-      if (b.timestamp !== a.timestamp) return b.timestamp.localeCompare(a.timestamp);
-      return b.sequence - a.sequence;
-    });
-    latestFiles.push(files[0]);
-  }
-
-  // Step 5: Parse CAP and build alerts
-  const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '' });
+  // --- STEP 3: Parse and build alerts ---
   const allAlerts: Alert[] = [];
+  const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '' });
 
-  for (const cap of latestFiles) {
-    const capUrl = `${subdirUrl}${cap.filename}`;
-    const capResponse = await axios.get(capUrl);
-    const xmlData = capResponse.data;
+  for (const productCode in groupedByProduct) {
+    const fileGroup = groupedByProduct[productCode];
+    const tempVersions: { version: AlertVersion, fullInfo: CapInfo }[] = [];
 
-    const jsonData: CapEntry = parser.parse(xmlData);
-    const alertData = jsonData.alert || {};
-    const metadata = jsonData.metadata;
+    for (const { file, subdirUrl } of fileGroup) {
+      const capUrl = `${subdirUrl}${file.filename}`;
+      try {
+        const response = await axios.get(capUrl);
+        const jsonData: { alert: CapAlert } = parser.parse(response.data);
+        const alertData = jsonData.alert || {};
+        let infos = alertData.info || [];
+        if (!Array.isArray(infos)) infos = infos ? [infos] : [];
+        const englishInfo = infos.find(info => info.language === 'en-CA');
 
-    let infos = alertData.info || [];
-    if (!Array.isArray(infos)) infos = infos ? [infos] : [];
+        if (englishInfo && alertData.sent && !isNaN(new Date(alertData.sent).getTime())) {
+          tempVersions.push({
+            version: {
+              headline: englishInfo.headline ?? 'N/A',
+              description: englishInfo.description ?? 'N/A',
+              instruction: typeof englishInfo.instruction === 'string' ? englishInfo.instruction : 'No instructions provided.',
+              severity: englishInfo.severity ?? 'N/A',
+              published: alertData.sent,
+            },
+            fullInfo: englishInfo,
+          });
+        }
+      } catch (err) {
+        // Skip file if fetch or parse fails
+        continue;
+      }
+    }
 
-    const englishInfos = infos.filter(info => info.language === 'en-CA');
+    if (tempVersions.length === 0) continue;
 
-    const versions: AlertVersion[] = englishInfos.map(info => ({
-      headline: info.headline ?? 'N/A',
-      description: info.description ?? 'N/A',
-      instruction: typeof info.instruction === 'string' ? info.instruction : 'No instructions provided.',
-      severity: info.severity ?? 'N/A',
-      published: alertData.sent ?? 'N/A',
-    }));
+    // Sort all versions by publish date
+    tempVersions.sort((a, b) => new Date(b.version.published).getTime() - new Date(a.version.published).getTime());
+    const latest = tempVersions[0];
 
-    versions.sort((a, b) => new Date(b.published).getTime() - new Date(a.published).getTime());
-
-    const latest = versions[0];
-    const latestInfo = englishInfos[0];
-
-    // --- New isActive logic using only Alert_Location_Status ---
-    const locationStatus = metadata?.Alert_Location_Status?.value;
-    const isActive = locationStatus === 'active';
-
-    // Debug logs
-    console.log('\n--- Debug: Final Parsed Alert ---');
-    console.log(`Filename: ${cap.filename}`);
-    console.log(`Product Code: ${cap.productCode}`);
-    console.log(`Event: ${latestInfo?.event}`);
-    console.log(`Headline: ${latest?.headline}`);
-    console.log(`Location Status: ${locationStatus}`);
-    console.log(`isActive: ${isActive}`);
-    console.log('--- End of Alert ---\n');
+    // Use Alert_Location_Status to determine if active
+    const locationStatusParam = latest.fullInfo.parameter?.find(p => p.valueName.includes('Alert_Location_Status'));
+    const isActive = locationStatusParam?.value === 'active';
 
     const alert: Alert = {
-      id: alertData.identifier ?? cap.filename,
-      title: latest?.headline ?? 'N/A',
-      summary: latest?.description ?? 'N/A',
-      event: latestInfo?.event ?? 'N/A',
-      severity: latest?.severity ?? 'N/A',
-      areaDesc: parseAreaDesc(latestInfo?.area),
-      productCode: cap.productCode,
-      published: latest?.published ?? 'N/A',
+      id: productCode,
+      productCode,
       region,
-      headline: latest?.headline ?? 'N/A',
-      description: latest?.description ?? 'N/A',
-      instruction: latest?.instruction ?? 'No instructions provided.',
-      polygons: getAllPolygons(latestInfo?.area),
-      versions,
+      event: latest.fullInfo.event ?? 'N/A',
+      published: latest.version.published,
+      headline: latest.version.headline,
+      severity: latest.version.severity,
+      description: latest.version.description,
+      instruction: latest.version.instruction,
+      areaDesc: parseAreaDesc(latest.fullInfo.area),
+      polygons: getAllPolygons(latest.fullInfo.area),
+      versions: tempVersions.map(t => t.version),
       isActive,
     };
 
