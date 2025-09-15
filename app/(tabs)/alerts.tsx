@@ -1,53 +1,63 @@
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import React, { useState } from 'react';
+import {
+  View,
+  Text,
+  FlatList,
+  StyleSheet,
+  TouchableOpacity,
+  ActivityIndicator,
+  Pressable,
+} from 'react-native';
 import { useAlerts } from '../../src/hooks/useAlerts';
 import { Link } from 'expo-router';
-import type { Alert } from '../../src/services/alertService';
-import { alertQuestMap } from '../../src/constants/quests/alertQuestMap';
+import { alertIcons } from '../../src/constants/alertIcons';
 import { formatTimeAgo } from '../../src/utils/dateUtils';
+import { alertQuestMap } from '../../src/constants/quests/alertQuestMap';
+import { Ionicons } from '@expo/vector-icons';
+import { severityColors } from '../../src/constants/colors';
+import type { Alert } from '../../src/services/alertService';
 
-/**
- * A reusable UI component to display a summary of a single alert.
- * It now shows the published time instead of the long area description and
- * conditionally renders a "Prepare" button based on the alert's status.
- */
-const AlertCard = ({ item }: { item: Alert }) => {
-  // Check if the alert event type has a corresponding quest in our map.
-  const questId = alertQuestMap[item.event.toLowerCase()];
-  // Check if the alert is over by looking for the word "ended" in the headline.
-  const isAlertEnded = item.headline.toLowerCase().includes('ended');
-
-  return (
-    <View style={styles.alertCard}>
-      <View style={styles.alertHeader}>
-        <Text style={styles.event}>{item.event}</Text>
-        <Text style={styles.time}>{formatTimeAgo(item.published)}</Text>
-      </View>
-      <Text style={styles.title}>{item.headline}</Text>
-      <Text style={styles.detail}>Severity: {item.severity}</Text>
-
-      {/* Only show the "Prepare Now" button if a relevant quest exists AND the alert has not ended. */}
-      {questId && !isAlertEnded && (
-        <Link href={`/quests/${questId}`} asChild>
-          <TouchableOpacity style={styles.prepareButton}>
-            <Text style={styles.prepareButtonText}>Prepare Now</Text>
-          </TouchableOpacity>
-        </Link>
-      )}
-    </View>
-  );
-};
-
-/**
- * The main screen for the "Alerts" tab.
- * Fetches and displays a list of all emergency alerts for the user's region.
- * Now categorizes alerts into Active and Inactive groups based on CAP metadata.
- */
 export default function AlertsScreen(): React.JSX.Element {
   const { alerts, loading, error } = useAlerts();
+  const [showPast, setShowPast] = useState(false);
 
-  // Split alerts into active and inactive groups
   const activeAlerts = alerts.filter(a => a.isActive);
-  const inactiveAlerts = alerts.filter(a => !a.isActive);
+  const pastAlerts = alerts.filter(a => !a.isActive);
+
+  const togglePastAlerts = () => setShowPast(prev => !prev);
+
+  const renderAlertCard = (item: Alert) => {
+    const iconName = alertIcons[item.event.toLowerCase()] || 'alert-circle-outline';
+    const severityColor = severityColors[item.severity.toLowerCase()] || '#999';
+    const questId = alertQuestMap[item.event.toLowerCase()];
+    const isEnded = item.headline.toLowerCase().includes('ended');
+
+    return (
+      <Link href={`/alert-detail/${item.id}`} asChild>
+        <TouchableOpacity style={styles.alertCard}>
+          <View style={styles.iconRow}>
+            <Ionicons name={iconName} size={26} color={severityColor} style={{ marginRight: 10 }} />
+            <Text style={[styles.eventText, { color: severityColor }]}>
+              {item.event} ({item.severity})
+            </Text>
+            <Text style={styles.timeAgo}>{formatTimeAgo(item.published)}</Text>
+          </View>
+          <Text style={styles.headline} numberOfLines={2}>
+            {item.headline}
+          </Text>
+
+          {/* Prepare Now button */}
+          {questId && !isEnded && (
+            <Link href={`/quests/${questId}`} asChild>
+              <TouchableOpacity style={styles.prepareButton}>
+                <Text style={styles.prepareButtonText}>Prepare Now</Text>
+              </TouchableOpacity>
+            </Link>
+          )}
+        </TouchableOpacity>
+      </Link>
+    );
+  };
 
   if (loading) {
     return (
@@ -67,40 +77,39 @@ export default function AlertsScreen(): React.JSX.Element {
 
   return (
     <View style={styles.container}>
-      {/* Section: Active Alerts */}
+      {/* Header */}
       <Text style={styles.sectionTitle}>Active Alerts</Text>
+
+      {/* Active Alerts List */}
       <FlatList
         data={activeAlerts}
         keyExtractor={item => item.id}
-        renderItem={({ item }) => (
-          // Link component makes the card tappable, navigating to the alert detail screen.
-          <Link href={`/alert-detail/${item.id}`} asChild>
-            <TouchableOpacity>
-              <AlertCard item={item} />
-            </TouchableOpacity>
-          </Link>
-        )}
+        renderItem={({ item }) => renderAlertCard(item)}
         ListEmptyComponent={
           <View style={styles.centered}>
-            <Text>No active alerts</Text>
+            <Ionicons name="checkmark-done-outline" size={48} color="#ccc" />
+            <Text style={styles.noAlertsText}>No active alerts in the past 12 hours</Text>
           </View>
         }
       />
 
-      {/* Section: Inactive (Past) Alerts */}
-      {inactiveAlerts.length > 0 && (
+      {/* Toggle Button for Past Alerts */}
+      {pastAlerts.length > 0 && (
+        <Pressable onPress={togglePastAlerts} style={styles.toggleButton}>
+          <Text style={styles.toggleButtonText}>
+            {showPast ? 'Hide Past Alerts' : `Show ${pastAlerts.length} Past Alerts`}
+          </Text>
+        </Pressable>
+      )}
+
+      {/* Past Alerts */}
+      {showPast && (
         <>
           <Text style={styles.sectionTitle}>Past Alerts</Text>
           <FlatList
-            data={inactiveAlerts}
+            data={pastAlerts}
             keyExtractor={item => item.id}
-            renderItem={({ item }) => (
-              <Link href={`/alert-detail/${item.id}`} asChild>
-                <TouchableOpacity>
-                  <AlertCard item={item} />
-                </TouchableOpacity>
-              </Link>
-            )}
+            renderItem={({ item }) => renderAlertCard(item)}
           />
         </>
       )}
@@ -108,73 +117,80 @@ export default function AlertsScreen(): React.JSX.Element {
   );
 }
 
-// Stylesheet for the components on this screen.
+// Stylesheet
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    padding: 16, 
-    backgroundColor: '#f4f4f9' 
-  },
-  centered: {
+  container: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingTop: 50,
+    padding: 16,
+    backgroundColor: '#f4f4f9',
   },
   sectionTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    marginBottom: 8,
+    marginBottom: 12,
     color: '#2c3e50',
   },
-  alertCard: { 
-    backgroundColor: '#fff', 
-    padding: 16, 
-    marginBottom: 16, 
-    borderRadius: 12, 
-    shadowColor: '#000', 
-    shadowOpacity: 0.08, 
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 3 
-  },
-  alertHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  centered: {
     alignItems: 'center',
-    marginBottom: 4,
+    justifyContent: 'center',
+    marginTop: 40,
   },
-  event: { 
-    fontSize: 18, 
-    fontWeight: 'bold',
-    textTransform: 'capitalize',
-    color: '#2c3e50',
+  noAlertsText: {
+    fontSize: 16,
+    color: '#888',
+    marginTop: 12,
+    textAlign: 'center',
+  },
+  alertCard: {
+    backgroundColor: '#fff',
+    padding: 14,
+    borderRadius: 12,
+    marginBottom: 14,
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 3,
+  },
+  iconRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  eventText: {
+    fontSize: 16,
+    fontWeight: '600',
     flex: 1,
+    textTransform: 'capitalize',
   },
-  time: {
-    fontSize: 14,
+  timeAgo: {
+    fontSize: 12,
     color: '#7f8c8d',
   },
-  title: { 
-    fontSize: 16, 
-    marginTop: 4, 
-    color: '#34495e' 
-  },
-  detail: { 
-    fontSize: 14, 
-    color: '#7f8c8d', 
-    marginTop: 8 
+  headline: {
+    fontSize: 15,
+    color: '#34495e',
+    marginBottom: 8,
   },
   prepareButton: {
-    backgroundColor: '#007AFF',
-    paddingVertical: 12,
+    backgroundColor: '#007aff',
+    paddingVertical: 8,
     borderRadius: 8,
-    marginTop: 16,
     alignItems: 'center',
+    marginTop: 4,
   },
   prepareButtonText: {
     color: '#fff',
-    fontSize: 16,
     fontWeight: 'bold',
+    fontSize: 14,
+  },
+  toggleButton: {
+    marginTop: 16,
+    alignSelf: 'center',
+  },
+  toggleButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#007aff',
   },
 });
