@@ -17,4 +17,3 @@ export const alertQuestMap: Record<string, string> = {
   'wildfire': 'hazard-wildfire-1', 
   'air quality': 'hazard-wildfire-smoke-1', 
 };
-

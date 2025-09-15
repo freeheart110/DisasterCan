@@ -14,8 +14,7 @@ export default function RootLayout() {
   useEffect(() => {
     // Wait until the user's location has been successfully determined.
     if (locationInfo?.province) {
-      console.log("Detected province code:", locationInfo.province);
-      // Once we have the province, initialize the quest store with it.
+      // Once the province is known, initialize the quest store with it.
       // This will load both common quests and the correct regional quests.
       initializeQuests(locationInfo.province);
     }

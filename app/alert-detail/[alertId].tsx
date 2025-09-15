@@ -87,19 +87,19 @@ export default function AlertDetailScreen(): React.JSX.Element {
       <View style={styles.contentContainer}>
         <Text style={styles.headline}>{alert.headline}</Text>
 
-        <View style={styles.detailSection}>
-          <Text style={styles.sectionTitle}>Description</Text>
-          <Text style={styles.bodyText}>{alert.description}</Text>
-          
-          {/* Only render the Instructions section if there are instructions provided. */}
-          {alert.instruction !== 'No instructions provided.' && (
-            <>
-              <Text style={styles.sectionTitle}>Instructions</Text>
-              <Text style={styles.bodyText}>{alert.instruction}</Text>
-            </>
-          )}
-          
-        </View>
+        <Text style={styles.sectionTitle}>Alert History</Text>
+        {alert.versions.map((version, idx) => (
+          <View key={idx} style={styles.historyCard}>
+            <Text style={styles.historyHeadline}>{version.headline}</Text>
+            <Text style={styles.historyMeta}>
+              {version.severity} · {new Date(version.published).toLocaleString()}
+            </Text>
+            <Text style={styles.historyText}>{version.description}</Text>
+            {version.instruction && version.instruction !== 'No instructions provided.' && (
+              <Text style={styles.historyText}>{version.instruction}</Text>
+            )}
+          </View>
+        ))}
       </View>
     </ScrollView>
   );
@@ -144,6 +144,38 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 24,
     color: '#555',
+  },
+  historyItem: {
+    marginBottom: 16,
+    padding: 12,
+    backgroundColor: '#f9f9f9',
+    borderRadius: 8,
+  },
+  historyHeadline: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+    textTransform: 'capitalize',
+  },
+  historyText: {
+    fontSize: 14,
+    color: '#444',
+    marginBottom: 4,
+  },
+  historyDescription: {
+    fontSize: 14,
+    color: '#555',
+  },
+  historyCard: {
+    backgroundColor: '#f9f9f9',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 12,
+  },
+  historyMeta: {
+    fontSize: 12,
+    color: '#888',
+    marginBottom: 8,
   },
 });
 

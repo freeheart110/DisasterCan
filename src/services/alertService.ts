@@ -1,10 +1,16 @@
 import axios from 'axios';
 import { XMLParser } from 'fast-xml-parser';
 import { getLocationInfo } from './locationService';
-import { isPointInPolygon } from 'geolib';
 import { parsePolygon } from '../utils/mapUtils';
 
-// --- TYPE DEFINITIONS ---
+// Types for UI-facing alert data
+export interface AlertVersion {
+  headline: string;
+  description: string;
+  instruction: string;
+  severity: string;
+  published: string;
+}
 
 export interface Alert {
   id: string;
@@ -19,11 +25,12 @@ export interface Alert {
   headline: string;
   description: string;
   instruction: string;
-  // An alert can have multiple polygons, so this is now an array of strings.
   polygons?: string[];
+  versions: AlertVersion[];
+  isActive: boolean;
 }
 
-// Internal types for parsing the raw XML data.
+// Internal CAP structures
 interface CapArea {
   areaDesc?: string;
   polygon?: string;
@@ -37,13 +44,24 @@ interface CapInfo {
   event?: string;
   severity?: string;
   language?: string;
-  [key: string]: unknown;
+  expires?: string;
 }
 
 interface CapAlert {
   identifier?: string;
   sent?: string;
   info?: CapInfo | CapInfo[];
+}
+
+interface CapMetadata {
+  Alert_Location_Status: {
+    value: 'active' | 'ended';
+  };
+}
+
+interface CapEntry {
+  alert: CapAlert;
+  metadata: CapMetadata;
 }
 
 interface ParsedFilename {
@@ -53,8 +71,7 @@ interface ParsedFilename {
   sequence: number;
 }
 
-// --- UTILS ---
-
+// Helpers
 const getAlertBaseUrl = (region: string): string => {
   const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
   return `https://dd.weather.gc.ca/alerts/cap/${today}/${region}/`;
@@ -66,18 +83,12 @@ const parseAreaDesc = (area: CapInfo['area']): string => {
   return areas.map(a => a.areaDesc ?? 'N/A').join(', ');
 };
 
-// New utility to get ALL polygons from an alert, not just the first one.
 const getAllPolygons = (area: CapInfo['area']): string[] => {
   if (!area) return [];
   const areas = Array.isArray(area) ? area : [area];
-  // Filter out any areas that don't have a polygon and return the strings.
   return areas.map(a => a.polygon).filter((p): p is string => !!p);
 };
 
-/**
- * Parses the complex CAP filename to extract metadata like product code,
- * timestamp, and sequence number, which are crucial for filtering alerts.
- */
 const parseFilename = (filename: string): ParsedFilename => {
   const parts = filename.split('_');
   const productCode = parts.length > 1 ? parts[1] : 'N/A';
@@ -86,25 +97,22 @@ const parseFilename = (filename: string): ParsedFilename => {
   return { filename, productCode, timestamp, sequence };
 };
 
-// --- MAIN WORKFLOW ---
-
+// Main function
 export const getLatestAlerts = async (): Promise<Alert[]> => {
-  // STEP 1: Determine user's location and corresponding alert region.
   const locationInfo = await getLocationInfo();
   const region = locationInfo.regionCode;
   const ALERT_BASE_URL = getAlertBaseUrl(region);
 
+  // Step 1: Load directory
   let dirResponse;
   try {
     dirResponse = await axios.get(ALERT_BASE_URL);
   } catch (error) {
-    if (axios.isAxiosError(error) && error.response?.status === 404) {
-      return [];
-    }
+    if (axios.isAxiosError(error) && error.response?.status === 404) return [];
     throw error;
   }
 
-  // STEP 2: Find the most recent hourly subdirectory for today's alerts.
+  // Step 2: Get latest subdir (hour)
   const subdirs: string[] = [];
   const regex = /href="(\d{2}\/)"/g;
   let match: RegExpExecArray | null;
@@ -113,11 +121,10 @@ export const getLatestAlerts = async (): Promise<Alert[]> => {
   }
 
   if (subdirs.length === 0) return [];
-
   const latestSubdir = subdirs.sort().reverse()[0];
   const subdirUrl = `${ALERT_BASE_URL}${latestSubdir}`;
 
-  // STEP 3: Get all .cap filenames from the latest hourly directory.
+  // Step 3: Get all .cap files in that hour
   const subdirResponse = await axios.get(subdirUrl);
   const capFiles: string[] = [];
   const capRegex = /href="([^"]*\.cap)"/g;
@@ -127,21 +134,19 @@ export const getLatestAlerts = async (): Promise<Alert[]> => {
 
   if (capFiles.length === 0) return [];
 
-  // STEP 4: Filter for the single latest version of each unique alert.
-  // This prevents showing outdated or superseded alerts by grouping all found
-  // files by a product code, then sorting them by timestamp and sequence number.
+  // Step 4: Group by productCode and pick latest
   const parsedFiles = capFiles.map(parseFilename);
-  const groupedByProduct: { [key: string]: ParsedFilename[] } = {};
+  const grouped: { [key: string]: ParsedFilename[] } = {};
+
   for (const file of parsedFiles) {
-    if (!groupedByProduct[file.productCode]) {
-      groupedByProduct[file.productCode] = [];
-    }
-    groupedByProduct[file.productCode].push(file);
+    if (!grouped[file.productCode]) grouped[file.productCode] = [];
+    grouped[file.productCode].push(file);
   }
 
   const latestFiles: ParsedFilename[] = [];
-  for (const productCode in groupedByProduct) {
-    const files = groupedByProduct[productCode];
+
+  for (const productCode in grouped) {
+    const files = grouped[productCode];
     files.sort((a, b) => {
       if (b.timestamp !== a.timestamp) return b.timestamp.localeCompare(a.timestamp);
       return b.sequence - a.sequence;
@@ -149,102 +154,71 @@ export const getLatestAlerts = async (): Promise<Alert[]> => {
     latestFiles.push(files[0]);
   }
 
-  // STEP 5: Fetch and parse the content for each of the final alert files.
+  // Step 5: Parse CAP and build alerts
+  const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '' });
   const allAlerts: Alert[] = [];
+
   for (const cap of latestFiles) {
     const capUrl = `${subdirUrl}${cap.filename}`;
     const capResponse = await axios.get(capUrl);
     const xmlData = capResponse.data;
-    const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '' });
-    const jsonData: { alert: CapAlert } = parser.parse(xmlData);
+
+    const jsonData: CapEntry = parser.parse(xmlData);
     const alertData = jsonData.alert || {};
+    const metadata = jsonData.metadata;
+
     let infos = alertData.info || [];
     if (!Array.isArray(infos)) infos = infos ? [infos] : [];
-    
-    // Process only the English version of the alert to avoid duplicates.
+
     const englishInfos = infos.filter(info => info.language === 'en-CA');
 
-    const parsed = englishInfos.map((info: CapInfo, idx: number): Alert => {
-      const instructionText = (typeof info.instruction === 'string' && info.instruction)
-        ? info.instruction
-        : 'No instructions provided.';
+    const versions: AlertVersion[] = englishInfos.map(info => ({
+      headline: info.headline ?? 'N/A',
+      description: info.description ?? 'N/A',
+      instruction: typeof info.instruction === 'string' ? info.instruction : 'No instructions provided.',
+      severity: info.severity ?? 'N/A',
+      published: alertData.sent ?? 'N/A',
+    }));
 
-      return {
-        id: `${alertData.identifier ?? cap.filename}-${idx}`,
-        title: info.headline ?? 'N/A',
-        summary: info.description ?? 'N/A',
-        event: info.event ?? 'N/A',
-        severity: info.severity ?? 'N/A',
-        areaDesc: parseAreaDesc(info.area),
-        productCode: cap.productCode,
-        published: alertData.sent ?? 'N/A',
-        region: region,
-        headline: info.headline ?? 'N/A',
-        description: info.description ?? 'N/A',
-        instruction: instructionText,
-        polygons: getAllPolygons(info.area),
-      };
-    });
-    allAlerts.push(...parsed);
+    versions.sort((a, b) => new Date(b.published).getTime() - new Date(a.published).getTime());
+
+    const latest = versions[0];
+    const latestInfo = englishInfos[0];
+
+    // --- New isActive logic using only Alert_Location_Status ---
+    const locationStatus = metadata?.Alert_Location_Status?.value;
+    const isActive = locationStatus === 'active';
+
+    // Debug logs
+    console.log('\n--- Debug: Final Parsed Alert ---');
+    console.log(`Filename: ${cap.filename}`);
+    console.log(`Product Code: ${cap.productCode}`);
+    console.log(`Event: ${latestInfo?.event}`);
+    console.log(`Headline: ${latest?.headline}`);
+    console.log(`Location Status: ${locationStatus}`);
+    console.log(`isActive: ${isActive}`);
+    console.log('--- End of Alert ---\n');
+
+    const alert: Alert = {
+      id: alertData.identifier ?? cap.filename,
+      title: latest?.headline ?? 'N/A',
+      summary: latest?.description ?? 'N/A',
+      event: latestInfo?.event ?? 'N/A',
+      severity: latest?.severity ?? 'N/A',
+      areaDesc: parseAreaDesc(latestInfo?.area),
+      productCode: cap.productCode,
+      published: latest?.published ?? 'N/A',
+      region,
+      headline: latest?.headline ?? 'N/A',
+      description: latest?.description ?? 'N/A',
+      instruction: latest?.instruction ?? 'No instructions provided.',
+      polygons: getAllPolygons(latestInfo?.area),
+      versions,
+      isActive,
+    };
+
+    allAlerts.push(alert);
   }
 
-  // --- Start of commented out section ---
-  /*
-  // STEP 6: Apply precision geofencing to filter alerts to the user's exact location.
-  const userLocation = {
-    latitude: locationInfo.latitude,
-    longitude: locationInfo.longitude,
-  };
-
-  console.log('Filtering alerts based on user location:', userLocation);
-  console.log('User city for text-based check:', locationInfo.city);
-
-  const relevantAlerts = allAlerts.filter(alert => {
-    // If the alert has polygon data, use precise geofencing.
-    if (alert.polygons && alert.polygons.length > 0) {
-      const isInside = alert.polygons.some(polygonString => {
-        const polygonCoords = parsePolygon(polygonString);
-        return isPointInPolygon(userLocation, polygonCoords);
-      });
-      
-      if (isInside) {
-        console.log(`Including alert (user inside polygon): ${alert.headline}`);
-      } else {
-        console.log(`Excluding alert (user outside polygon): ${alert.headline}`);
-      }
-      return isInside;
-    }
-
-    // If NO polygon data, fall back to a text-based check of the area description.
-    const userCity = locationInfo.city;
-    if (!userCity) {
-      // If no city name is given, exclude the alert to be safe.
-      console.log(`Excluding broad alert (no city info to check): ${alert.headline}`);
-      return false;
-    }
-
-    // Check if the user's city name is mentioned in the alert's area description.
-    // This is case-insensitive.
-    const isCityMentioned = alert.areaDesc.toLowerCase().includes(userCity.toLowerCase());
-    
-    if (isCityMentioned) {
-      console.log(`Including broad alert (city "${userCity}" mentioned): ${alert.headline}`);
-    } else {
-      console.log(`Excluding broad alert (city "${userCity}" not mentioned in "${alert.areaDesc}"): ${alert.headline}`);
-    }
-    
-    return isCityMentioned;
-  });
-  // ------------------------------------
-
-  console.log(`Found ${allAlerts.length} total alerts, and after filtering, ${relevantAlerts.length} are relevant to your location.`);
-
-  return relevantAlerts;
-  */
-  // --- End of commented out section ---
-  
-  // STEP 6: Return all alerts for the region without any location-specific filtering.
-  // The strict geofencing has been temporarily disabled to show all regional alerts.
   return allAlerts;
 };
-

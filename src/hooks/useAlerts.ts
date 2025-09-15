@@ -20,7 +20,15 @@ export const useAlerts = () => {
       
       try {
         const data = await getLatestAlerts();
-        setAlerts(data);
+
+        // Sort by latest published date (newest first)
+        const sorted = [...data].sort((a, b) => {
+          const dateA = new Date(a.published).getTime();
+          const dateB = new Date(b.published).getTime();
+          return dateB - dateA;
+        });
+
+        setAlerts(sorted);
         setLastChecked(new Date()); // Update the last checked timestamp
       } catch (err) {
         setError((err as Error).message ?? 'Failed to fetch alerts');

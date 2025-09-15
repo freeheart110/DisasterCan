@@ -22,9 +22,9 @@ export const formatTimeAgo = (utcDateString: string): string => {
   
   // --- CONSOLE LOGS FOR VERIFICATION ---
   // Log the times to the terminal to confirm they are being handled as UTC.
-  console.log('--- Time Calculation ---');
-  console.log('Alert Time (UTC):', alertDate.toUTCString());
-  console.log('Current Time (UTC):', now.toUTCString());
+  // console.log('--- Time Calculation ---');
+  // console.log('Alert Time (UTC):', alertDate.toUTCString());
+  // console.log('Current Time (UTC):', now.toUTCString());
   // ------------------------------------
   // Calculate the difference in seconds. getTime() returns milliseconds since
   // the UTC epoch for both dates, making the comparison timezone-agnostic.

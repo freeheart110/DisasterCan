@@ -3,27 +3,30 @@ import { useAlerts } from '../../src/hooks/useAlerts';
 import { Link } from 'expo-router';
 import type { Alert } from '../../src/services/alertService';
 import { alertQuestMap } from '../../src/constants/quests/alertQuestMap';
+import { formatTimeAgo } from '../../src/utils/dateUtils';
 
 /**
  * A reusable UI component to display a summary of a single alert.
- * It now includes a conditional "Prepare" button if a relevant quest exists.
+ * It now shows the published time instead of the long area description and
+ * conditionally renders a "Prepare" button based on the alert's status.
  */
 const AlertCard = ({ item }: { item: Alert }) => {
-  // Check the map to see if there is a quest associated with this alert's event type.
+  // Check if the alert event type has a corresponding quest in our map.
   const questId = alertQuestMap[item.event.toLowerCase()];
+  // Check if the alert is over by looking for the word "ended" in the headline.
+  const isAlertEnded = item.headline.toLowerCase().includes('ended');
 
   return (
     <View style={styles.alertCard}>
-      <Link href={`/alert-detail/${item.id}`} asChild>
-        <TouchableOpacity style={styles.alertContent}>
-          <Text style={styles.event}>{item.event}</Text>
-          <Text style={styles.title}>{item.headline}</Text>
-          <Text style={styles.detail}>Severity: {item.severity}</Text>
-          <Text style={styles.detail}>Area: {item.areaDesc}</Text>
-        </TouchableOpacity>
-      </Link>
-      {/* Conditionally render the "Prepare" button if a matching quest was found. */}
-      {questId && (
+      <View style={styles.alertHeader}>
+        <Text style={styles.event}>{item.event}</Text>
+        <Text style={styles.time}>{formatTimeAgo(item.published)}</Text>
+      </View>
+      <Text style={styles.title}>{item.headline}</Text>
+      <Text style={styles.detail}>Severity: {item.severity}</Text>
+
+      {/* Only show the "Prepare Now" button if a relevant quest exists AND the alert has not ended. */}
+      {questId && !isAlertEnded && (
         <Link href={`/quests/${questId}`} asChild>
           <TouchableOpacity style={styles.prepareButton}>
             <Text style={styles.prepareButtonText}>Prepare Now</Text>
@@ -36,13 +39,16 @@ const AlertCard = ({ item }: { item: Alert }) => {
 
 /**
  * The main screen for the "Alerts" tab.
- * It fetches and displays a list of all active emergency alerts.
+ * Fetches and displays a list of all emergency alerts for the user's region.
+ * Now categorizes alerts into Active and Inactive groups based on CAP metadata.
  */
 export default function AlertsScreen(): React.JSX.Element {
-  // Fetch the global state of all alerts, including loading and error status.
   const { alerts, loading, error } = useAlerts();
 
-  // Show a loading indicator while alerts are being fetched.
+  // Split alerts into active and inactive groups
+  const activeAlerts = alerts.filter(a => a.isActive);
+  const inactiveAlerts = alerts.filter(a => !a.isActive);
+
   if (loading) {
     return (
       <View style={styles.centered}>
@@ -51,7 +57,6 @@ export default function AlertsScreen(): React.JSX.Element {
     );
   }
 
-  // Display an error message if the fetch fails.
   if (error) {
     return (
       <View style={styles.centered}>
@@ -62,21 +67,46 @@ export default function AlertsScreen(): React.JSX.Element {
 
   return (
     <View style={styles.container}>
-      {/* Renders a list of alert cards. */}
+      {/* Section: Active Alerts */}
+      <Text style={styles.sectionTitle}>Active Alerts</Text>
       <FlatList
-        data={alerts}
+        data={activeAlerts}
         keyExtractor={item => item.id}
-        renderItem={({ item }) => <AlertCard item={item} />}
-        // Displays a message if there are no active alerts.
+        renderItem={({ item }) => (
+          // Link component makes the card tappable, navigating to the alert detail screen.
+          <Link href={`/alert-detail/${item.id}`} asChild>
+            <TouchableOpacity>
+              <AlertCard item={item} />
+            </TouchableOpacity>
+          </Link>
+        )}
         ListEmptyComponent={
           <View style={styles.centered}>
             <Text>No active alerts</Text>
           </View>
         }
       />
+
+      {/* Section: Inactive (Past) Alerts */}
+      {inactiveAlerts.length > 0 && (
+        <>
+          <Text style={styles.sectionTitle}>Past Alerts</Text>
+          <FlatList
+            data={inactiveAlerts}
+            keyExtractor={item => item.id}
+            renderItem={({ item }) => (
+              <Link href={`/alert-detail/${item.id}`} asChild>
+                <TouchableOpacity>
+                  <AlertCard item={item} />
+                </TouchableOpacity>
+              </Link>
+            )}
+          />
+        </>
+      )}
     </View>
   );
-};
+}
 
 // Stylesheet for the components on this screen.
 const styles = StyleSheet.create({
@@ -91,43 +121,60 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: 50,
   },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 8,
+    color: '#2c3e50',
+  },
   alertCard: { 
     backgroundColor: '#fff', 
-    borderRadius: 8, 
+    padding: 16, 
     marginBottom: 16, 
+    borderRadius: 12, 
     shadowColor: '#000', 
-    shadowOpacity: 0.1, 
-    shadowRadius: 4, 
+    shadowOpacity: 0.08, 
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
     elevation: 3 
   },
-  alertContent: {
-    padding: 16,
+  alertHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
   },
   event: { 
     fontSize: 18, 
     fontWeight: 'bold',
     textTransform: 'capitalize',
+    color: '#2c3e50',
+    flex: 1,
+  },
+  time: {
+    fontSize: 14,
+    color: '#7f8c8d',
   },
   title: { 
     fontSize: 16, 
     marginTop: 4, 
-    color: '#333' 
+    color: '#34495e' 
   },
   detail: { 
     fontSize: 14, 
-    color: '#666', 
-    marginTop: 4 
+    color: '#7f8c8d', 
+    marginTop: 8 
   },
   prepareButton: {
     backgroundColor: '#007AFF',
     paddingVertical: 12,
-    borderBottomLeftRadius: 8,
-    borderBottomRightRadius: 8,
+    borderRadius: 8,
+    marginTop: 16,
+    alignItems: 'center',
   },
   prepareButtonText: {
     color: '#fff',
-    textAlign: 'center',
+    fontSize: 16,
     fontWeight: 'bold',
   },
 });
-
