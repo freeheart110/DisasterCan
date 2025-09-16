@@ -16,6 +16,8 @@ import { useLocations } from '../../src/hooks/useLocations';
 import { severityColors } from '../../src/constants/colors';
 import { Ionicons } from '@expo/vector-icons';
 import { alertIcons } from '../../src/constants/alertIcons'; 
+import { useWeather } from '../../src/hooks/useWeather';
+import { WeatherCard } from '../../src/components/WeatherCard';
 
 // === Simple horizontal progress bar ===
 const ProgressBar = ({ progress }: { progress: number }) => (
@@ -33,6 +35,9 @@ export default function HomeScreen(): React.JSX.Element {
     isPolling,
     lastChecked,
   } = useAlerts();
+  
+  // Fetch weather card
+  const { weather, loading: weatherLoading } = useWeather();
 
   // Fetch location debug info
   const {
@@ -146,6 +151,9 @@ export default function HomeScreen(): React.JSX.Element {
   return (
     <ScrollView style={styles.container}>
       <Text style={styles.header}>Dashboard</Text>
+
+      {/* Weather Section (if available) */}
+      {!weatherLoading && weather && <WeatherCard weather={weather} />}
 
       {/* Location Debug Info */}
       <View style={styles.card}>

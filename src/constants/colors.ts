@@ -3,9 +3,9 @@
  */
 export const severityColors: Record<string, string> = {
   extreme: '#c0392b',   // deep red
-  severe: '#e67e22',    // orange
-  moderate: '#f1c40f',  // yellow
-  minor: '#3498db',     // blue
+  severe: '#d35400',    // orange
+  moderate: '#f39c12',  // yellow
+  minor: '#2980b9',     // blue
   unknown: '#7f8c8d',   // gray
 };
 

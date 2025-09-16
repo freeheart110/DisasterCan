@@ -193,7 +193,7 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   historyCard: {
-    backgroundColor: '#f9f9f9',
+    backgroundColor: '#eaeaea',
     padding: 12,
     borderRadius: 8,
     marginTop: 12,
