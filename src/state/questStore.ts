@@ -2,7 +2,6 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { loadQuestsForProvince } from '../services/questService';
-// The import for 'QuestCategory' has been removed as it does not exist as a separate type.
 import type { Quest } from '../constants/quests/types';
 
 // Defines the shape of the Zustand store, including its state and actions.
