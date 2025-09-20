@@ -32,12 +32,12 @@ export default function RootLayout() {
     console.log( 'Profile state updated:', profile);
   }
 }, [profile]);
-  // Load regional quests
+  // Load regional quests after profile and location are ready
   useEffect(() => {
-    if (locationInfo?.province) {
-      initializeQuests(locationInfo.province);
+    if (profile && locationInfo?.province) {
+      initializeQuests(profile.userId, locationInfo.province);
     }
-  }, [locationInfo, initializeQuests]);
+  }, [profile, locationInfo, initializeQuests]);
 
   return (
     <Stack>

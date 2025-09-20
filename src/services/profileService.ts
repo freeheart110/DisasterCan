@@ -4,6 +4,7 @@
 
     // Defines the shape of the user's profile data in Firestore
     export interface UserProfile {
+      userId: string;
       xp: number;
       level: number;
       badges: string[];
@@ -18,21 +19,28 @@
      * @returns The user's profile data.
      */
     export const getUserProfile = async (userId: string): Promise<UserProfile> => {
-      const userDocRef = doc(db, 'users', userId);
-      const docSnap = await getDoc(userDocRef);
+      try {
+        console.log('📛 userId passed to getUserProfile:', userId); 
+        const userDocRef = doc(db, 'users', userId);
+        const docSnap = await getDoc(userDocRef);
 
-      if (docSnap.exists()) {
-        return docSnap.data() as UserProfile;
-      } else {
-        // If the user is new, create a default profile for them.
-        const defaultProfile: UserProfile = {
-          xp: 0,
-          level: 1,
-          badges: [],
-          completedQuests: {},
-        };
-        await setDoc(userDocRef, defaultProfile);
-        return defaultProfile;
+        if (docSnap.exists()) {
+          return docSnap.data() as UserProfile;
+        } else {
+          // If the user is new, create a default profile for them.
+          const defaultProfile: UserProfile = {
+            userId,
+            xp: 0,
+            level: 1,
+            badges: [],
+            completedQuests: {},
+          };
+          await setDoc(userDocRef, defaultProfile);
+          return defaultProfile;
+        }
+      } catch (error) {
+        console.error("Failed to get or create user profile:", error);
+        throw error;
       }
     };
 

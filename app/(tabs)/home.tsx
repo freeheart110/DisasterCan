@@ -15,16 +15,10 @@ import { useQuestStore } from '../../src/state/questStore';
 import { useLocations } from '../../src/hooks/useLocations';
 import { severityColors } from '../../src/constants/colors';
 import { Ionicons } from '@expo/vector-icons';
-import { alertIcons } from '../../src/constants/alertIcons'; 
+import { alertIcons } from '../../src/constants/alertIcons';
+import { GamificationCard } from '../../src/components/GamificationCard'; 
 import { useWeather } from '../../src/hooks/useWeather';
 import { WeatherCard } from '../../src/components/WeatherCard';
-
-// === Simple horizontal progress bar ===
-const ProgressBar = ({ progress }: { progress: number }) => (
-  <View style={styles.progressBarContainer}>
-    <View style={[styles.progressBar, { width: `${progress}%` }]} />
-  </View>
-);
 
 export default function HomeScreen(): React.JSX.Element {
   // Fetch alerts (polling, loading, error, timestamps)
@@ -45,11 +39,6 @@ export default function HomeScreen(): React.JSX.Element {
     loading: locationLoading,
     error: locationError,
   } = useLocations();
-
-  // Preparedness % from quest progress
-  const preparednessProgress = useQuestStore((state) =>
-    state.getTotalProgress()
-  );
 
   // === Alert List Renderer ===
   const renderAlertSummary = (): React.JSX.Element => {
@@ -151,7 +140,7 @@ export default function HomeScreen(): React.JSX.Element {
   return (
     <ScrollView style={styles.container}>
       <Text style={styles.header}>Dashboard</Text>
-
+      <GamificationCard />
       {/* Weather Section (if available) */}
       {!weatherLoading && weather && <WeatherCard weather={weather} />}
 
@@ -178,13 +167,6 @@ export default function HomeScreen(): React.JSX.Element {
             </Text>
           </View>
         )}
-      </View>
-
-      {/* Preparedness Progress Bar */}
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Preparedness Progress</Text>
-        <ProgressBar progress={preparednessProgress} />
-        <Text style={styles.progressText}>{preparednessProgress}% Ready</Text>
       </View>
 
       {/* Latest Alerts */}
