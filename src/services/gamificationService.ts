@@ -2,65 +2,49 @@ import { doc, updateDoc, increment, getDoc } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import type { UserProfile } from './profileService';
 
-// --- GAME RULES ---
-
-// Define how much XP is awarded for different actions.
-const XP_VALUES = {
-  CHECKLIST_ITEM: 20,
+// Game rules: point awards per action
+const POINT_VALUES = {
+  CHECKLIST_ITEM: 1,
   QUIZ_QUESTION_CORRECT: 5,
 };
 
-// XP required to reach each level (cumulative)
-export const XP_FOR_NEXT_LEVEL = (level: number) => level * 100;
+// Points required for each level (cumulative)
+export const POINTS_FOR_NEXT_LEVEL = (level: number): number => level * 100;
 
-/**
- * Calculates the user's level based on total XP.
- * @param totalXP The user's total XP in history.
- */
-export const calculateLevel = (totalXP: number): number => {
+export const calculateLevel = (totalPoints: number): number => {
   let level = 1;
-  while (totalXP >= XP_FOR_NEXT_LEVEL(level + 1)) {
+  while (totalPoints >= POINTS_FOR_NEXT_LEVEL(level + 1)) {
     level++;
   }
   return level;
 };
 
-/**
- * Atomically adds XP to the user and checks if they leveled up.
- * @param userId The unique ID of the user.
- * @param xpAmount The XP to award.
- */
-const awardXP = async (userId: string, xpAmount: number) => {
-  const userDocRef = doc(db, 'users', userId);
+const awardPoints = async (userId: string, amount: number) => {
+  const userRef = doc(db, 'users', userId);
 
-  // Atomically increment XP
-  await updateDoc(userDocRef, {
-    xp: increment(xpAmount),
+  await updateDoc(userRef, {
+    point: increment(amount),
   });
 
-  // Re-fetch the updated user profile
-  const snap = await getDoc(userDocRef);
+  const snap = await getDoc(userRef);
   if (!snap.exists()) return;
 
   const updatedProfile = snap.data() as UserProfile;
-  const newLevel = calculateLevel(updatedProfile.xp);
+  const newLevel = calculateLevel(updatedProfile.point);
 
-  // Update level if needed
   if (newLevel > updatedProfile.level) {
-    await updateDoc(userDocRef, {
+    await updateDoc(userRef, {
       level: newLevel,
-      // badges: arrayUnion(`Level ${newLevel} Reached`)
     });
     console.log(`🎉 User ${userId} leveled up to Level ${newLevel}`);
   }
 };
 
-// --- PUBLIC API ---
-
-export const awardXpForChecklistItem = async (userId: string) => {
-  await awardXP(userId, XP_VALUES.CHECKLIST_ITEM);
+// Public API
+export const awardPointForChecklistItem = async (userId: string, amount = POINT_VALUES.CHECKLIST_ITEM) => {
+  await awardPoints(userId, amount);
 };
 
-export const awardXpForQuizAnswer = async (userId: string) => {
-  await awardXP(userId, XP_VALUES.QUIZ_QUESTION_CORRECT);
+export const awardPointForQuizAnswer = async (userId: string) => {
+  await awardPoints(userId, POINT_VALUES.QUIZ_QUESTION_CORRECT);
 };

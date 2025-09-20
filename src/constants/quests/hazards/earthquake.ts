@@ -1,4 +1,4 @@
-import type { Quest } from '../types';
+import type { Quest } from '../questConfig';
 
 /**
  * @file earthquake.ts
@@ -9,49 +9,50 @@ import type { Quest } from '../types';
 export const earthquakeQuest: Quest = {
   id: 'hazard-earthquake-1',
   title: 'Prepare for Earthquakes',
+  format: 'checklist',
+  category: 'hazard',
   categories: [
     {
       title: '🏠 Home Protection',
       items: [
-        { id: 'earthquake-home-1', text: 'Secure heavy furniture, appliances, and shelves to walls to prevent tipping', completed: false }, // Source: Public Safety Canada (getprepared.gc.ca)
-        { id: 'earthquake-home-2', text: 'Install latches on cabinets and secure hanging items like pictures or mirrors', completed: false }, // Source: Canadian Red Cross (redcross.ca)
-        { id: 'earthquake-home-3', text: 'Identify and fix potential hazards like unsecured water heaters or gas lines', completed: false }, // Source: Natural Resources Canada (earthquakescanada.nrcan.gc.ca)
-        { id: 'earthquake-home-4', text: 'Know how to shut off utilities (gas, water, electricity) post-earthquake', completed: false }, // Source: PreparedBC (www2.gov.bc.ca)
-        { id: 'earthquake-home-5', text: 'Conduct a home hazard hunt and retrofit if in a high-risk area', completed: false }, // Source: Public Safety Canada (getprepared.gc.ca)
+        { id: 'earthquake-home-1', text: 'Secure heavy furniture, appliances, and shelves to walls to prevent tipping', completed: false, expiryDays: 1095 }, // Source: Public Safety Canada (getprepared.gc.ca)
+        { id: 'earthquake-home-2', text: 'Install latches on cabinets and secure hanging items like pictures or mirrors', completed: false, expiryDays: 1095 }, // Source: Canadian Red Cross (redcross.ca)
+        { id: 'earthquake-home-3', text: 'Identify and fix potential hazards like unsecured water heaters or gas lines', completed: false, expiryDays: 1095 }, // Source: Natural Resources Canada (earthquakescanada.nrcan.gc.ca)
+        { id: 'earthquake-home-4', text: 'Know how to shut off utilities (gas, water, electricity) post-earthquake', completed: false, expiryDays: 365 }, // Source: PreparedBC (www2.gov.bc.ca)
+        { id: 'earthquake-home-5', text: 'Conduct a home hazard hunt and retrofit if in a high-risk area', completed: false, expiryDays: 1460 }, // Source: Public Safety Canada (getprepared.gc.ca)
       ],
     },
     {
       title: '📋 Evacuation Planning',
       items: [
-        { id: 'earthquake-evac-1', text: 'Develop a family emergency plan with reunion points and out-of-area contacts', completed: false }, // Source: Canadian Red Cross (redcross.ca)
-        { id: 'earthquake-evac-2', text: 'Prepare a grab-and-go bag with essentials like water, food, medications, and documents', completed: false }, // Source: PreparedBC (www2.gov.bc.ca)
-        { id: 'earthquake-evac-3', text: 'Include plans for pets and family members with special needs', completed: false }, // Source: Natural Resources Canada (earthquakescanada.nrcan.gc.ca)
-        { id: 'earthquake-evac-4', text: 'Practice "Drop, Cover, and Hold On" drills regularly', completed: false }, // Source: Public Safety Canada (getprepared.gc.ca)
-        { id: 'earthquake-evac-5', text: 'Know tsunami evacuation routes if in a coastal area', completed: false }, // Source: PreparedBC (www2.gov.bc.ca)
+        { id: 'earthquake-evac-1', text: 'Develop a family emergency plan with reunion points and out-of-area contacts', completed: false, expiryDays: 365 }, // Source: Canadian Red Cross (redcross.ca)
+        { id: 'earthquake-evac-2', text: 'Prepare a grab-and-go bag with essentials like water, food, medications, and documents', completed: false, expiryDays: 180 }, // Source: PreparedBC (www2.gov.bc.ca)
+        { id: 'earthquake-evac-3', text: 'Include plans for pets and family members with special needs', completed: false, expiryDays: 365 }, // Source: Natural Resources Canada (earthquakescanada.nrcan.gc.ca)
+        { id: 'earthquake-evac-4', text: 'Practice "Drop, Cover, and Hold On" drills regularly', completed: false, expiryDays: 180 }, // Source: Public Safety Canada (getprepared.gc.ca)
+        { id: 'earthquake-evac-5', text: 'Know tsunami evacuation routes if in a coastal area', completed: false, expiryDays: 365 }, // Source: PreparedBC (www2.gov.bc.ca)
       ],
     },
     {
       title: '🛡️ Personal Safety',
       items: [
-        { id: 'earthquake-safety-1', text: 'Stock non-perishable food, water (4L per person/day), and a first-aid kit for 72 hours', completed: false }, // Source: Public Safety Canada (getprepared.gc.ca)
-        { id: 'earthquake-safety-2', text: 'Have flashlights, batteries, and a battery-powered radio for aftershocks', completed: false }, // Source: Canadian Red Cross (redcross.ca)
-        { id: 'earthquake-safety-3', text: 'Wear sturdy shoes and gloves to protect against debris post-earthquake', completed: false }, // Source: Natural Resources Canada (earthquakescanada.nrcan.gc.ca)
-        { id: 'earthquake-safety-4', text: 'Avoid elevators, bridges, and overpasses during and after shaking', completed: false }, // Source: PreparedBC (www2.gov.bc.ca)
-        { id: 'earthquake-safety-5', text: 'Check on neighbors, especially vulnerable individuals, after the event', completed: false }, // Source: Canadian Red Cross (redcross.ca)
+        { id: 'earthquake-safety-1', text: 'Stock non-perishable food, water (4L per person/day), and a first-aid kit for 72 hours', completed: false, expiryDays: 365 }, // Source: Public Safety Canada (getprepared.gc.ca)
+        { id: 'earthquake-safety-2', text: 'Have flashlights, batteries, and a battery-powered radio for aftershocks', completed: false, expiryDays: 730 }, // Source: Canadian Red Cross (redcross.ca)
+        { id: 'earthquake-safety-3', text: 'Wear sturdy shoes and gloves to protect against debris post-earthquake', completed: false, expiryDays: 730 }, // Source: Natural Resources Canada (earthquakescanada.nrcan.gc.ca)
+        { id: 'earthquake-safety-4', text: 'Avoid elevators, bridges, and overpasses during and after shaking', completed: false, expiryDays: 365 }, // Source: PreparedBC (www2.gov.bc.ca)
+        { id: 'earthquake-safety-5', text: 'Check on neighbors, especially vulnerable individuals, after the event', completed: false, expiryDays: 180 }, // Source: Canadian Red Cross (redcross.ca)
       ],
     },
     {
       title: '📡 Monitoring & Insurance',
       items: [
-        { id: 'earthquake-monitor-1', text: 'Sign up for earthquake alerts and early warning systems where available', completed: false }, // Source: PreparedBC (www2.gov.bc.ca)
-        { id: 'earthquake-monitor-2', text: 'Review your insurance policy for earthquake coverage', completed: false }, // Source: Public Safety Canada (getprepared.gc.ca)
-        { id: 'earthquake-monitor-3', text: 'Document your property with photos and inventory for claims', completed: false }, // Source: Canadian Red Cross (redcross.ca)
-        { id: 'earthquake-monitor-4', text: 'Participate in community earthquake drills or Great ShakeOut events', completed: false }, // Source: Natural Resources Canada (earthquakescanada.nrcan.gc.ca)
+        { id: 'earthquake-monitor-1', text: 'Sign up for earthquake alerts and early warning systems where available', completed: false, expiryDays: 365 }, // Source: PreparedBC (www2.gov.bc.ca)
+        { id: 'earthquake-monitor-2', text: 'Review your insurance policy for earthquake coverage', completed: false, expiryDays: 365 }, // Source: Public Safety Canada (getprepared.gc.ca)
+        { id: 'earthquake-monitor-3', text: 'Document your property with photos and inventory for claims', completed: false, expiryDays: 730 }, // Source: Canadian Red Cross (redcross.ca)
+        { id: 'earthquake-monitor-4', text: 'Participate in community earthquake drills or Great ShakeOut events', completed: false, expiryDays: 365 }, // Source: Natural Resources Canada (earthquakescanada.nrcan.gc.ca)
       ],
     },
   ],
 };
-
 // References
 // Canadian Red Cross. (n.d.). Earthquakes: Before, during & after. Canadian Red Cross. https://www.redcross.ca/how-we-help/emergencies-and-disasters-in-canada/types-of-emergencies/earthquakes
 // Natural Resources Canada. (n.d.). Preparing for earthquakes. Earthquakes Canada. https://www.earthquakescanada.nrcan.gc.ca/info-gen/prepare-preparer/index-en.php

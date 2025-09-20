@@ -1,4 +1,4 @@
-import type { Quest } from '../types';
+import type { Quest } from '../questConfig';
 
 /**
  * @file blizzard.ts
@@ -9,44 +9,46 @@ import type { Quest } from '../types';
 export const blizzardQuest: Quest = {
   id: 'hazard-blizzard-1',
   title: 'Prepare for Blizzards',
+  format: 'checklist',
+  category: 'hazard',
   categories: [
     {
       title: '🏠 Home Protection',
       items: [
-        { id: 'blizzard-home-1', text: 'Insulate pipes and seal drafts to prevent freezing', completed: false }, // Source: Public Safety Canada (getprepared.gc.ca)
-        { id: 'blizzard-home-2', text: 'Clear snow from roofs and around your home to prevent buildup', completed: false }, // Source: Canadian Red Cross (redcross.ca)
-        { id: 'blizzard-home-3', text: 'Install snow fences or barriers to reduce drifting snow', completed: false }, // Source: Canadian Red Cross (redcross.ca)
-        { id: 'blizzard-home-4', text: 'Stock alternative heating sources like wood stoves (with proper ventilation)', completed: false }, // Source: PreparedBC (preparedbc.ca)
-        { id: 'blizzard-home-5', text: 'Have shovels, ice melt, and roof rakes ready for snow removal', completed: false }, // Source: PreparedBC (preparedbc.ca)
+        { id: 'blizzard-home-1', text: 'Insulate pipes and seal drafts to prevent freezing', completed: false, expiryDays: 30 }, // Source: Public Safety Canada (getprepared.gc.ca)
+        { id: 'blizzard-home-2', text: 'Clear snow from roofs and around your home to prevent buildup', completed: false, expiryDays: 30 }, // Source: Canadian Red Cross (redcross.ca)
+        { id: 'blizzard-home-3', text: 'Install snow fences or barriers to reduce drifting snow', completed: false, expiryDays: 30 }, // Source: Canadian Red Cross (redcross.ca)
+        { id: 'blizzard-home-4', text: 'Stock alternative heating sources like wood stoves (with proper ventilation)', completed: false, expiryDays: 30 }, // Source: PreparedBC (preparedbc.ca)
+        { id: 'blizzard-home-5', text: 'Have shovels, ice melt, and roof rakes ready for snow removal', completed: false, expiryDays: 30 }, // Source: PreparedBC (preparedbc.ca)
       ],
     },
     {
       title: '📋 Evacuation Planning',
       items: [
-        { id: 'blizzard-evac-1', text: 'Develop a family plan for staying put or evacuating if needed', completed: false }, // Source: Public Safety Canada (getprepared.gc.ca)
-        { id: 'blizzard-evac-2', text: 'Prepare a vehicle emergency kit with blankets, food, and flares', completed: false }, // Source: Canadian Red Cross (redcross.ca)
-        { id: 'blizzard-evac-3', text: 'Know how to shut off utilities in case of damage', completed: false }, // Source: PreparedBC (preparedbc.ca)
-        { id: 'blizzard-evac-4', text: 'Identify safe shelters or warming centers in your area', completed: false }, // Source: Canadian Red Cross (redcross.ca)
-        { id: 'blizzard-evac-5', text: 'Practice dressing in layers and using emergency signals', completed: false }, // Source: Public Safety Canada (getprepared.gc.ca)
+        { id: 'blizzard-evac-1', text: 'Develop a family plan for staying put or evacuating if needed', completed: false, expiryDays: 30 }, // Source: Public Safety Canada (getprepared.gc.ca)
+        { id: 'blizzard-evac-2', text: 'Prepare a vehicle emergency kit with blankets, food, and flares', completed: false, expiryDays: 30 }, // Source: Canadian Red Cross (redcross.ca)
+        { id: 'blizzard-evac-3', text: 'Know how to shut off utilities in case of damage', completed: false, expiryDays: 30 }, // Source: PreparedBC (preparedbc.ca)
+        { id: 'blizzard-evac-4', text: 'Identify safe shelters or warming centers in your area', completed: false, expiryDays: 30 }, // Source: Canadian Red Cross (redcross.ca)
+        { id: 'blizzard-evac-5', text: 'Practice dressing in layers and using emergency signals', completed: false, expiryDays: 30 }, // Source: Public Safety Canada (getprepared.gc.ca)
       ],
     },
     {
       title: '🛡️ Personal Safety',
       items: [
-        { id: 'blizzard-safety-1', text: 'Stock non-perishable food, water (4L per person/day), and medications for at least 72 hours', completed: false }, // Source: Public Safety Canada (getprepared.gc.ca)
-        { id: 'blizzard-safety-2', text: 'Have blankets, warm clothing, and hand warmers for extreme cold', completed: false }, // Source: Canadian Red Cross (redcross.ca)
-        { id: 'blizzard-safety-3', text: 'Prepare for power outages with flashlights, batteries, and a crank radio', completed: false }, // Source: PreparedBC (preparedbc.ca)
-        { id: 'blizzard-safety-4', text: 'Avoid travel; if stranded in a vehicle, stay inside and run the engine sparingly', completed: false }, // Source: Canadian Red Cross (redcross.ca)
-        { id: 'blizzard-safety-5', text: 'Check on vulnerable neighbors, especially the elderly or those with medical needs', completed: false }, // Source: PreparedBC (preparedbc.ca)
+        { id: 'blizzard-safety-1', text: 'Stock non-perishable food, water (4L per person/day), and medications for at least 72 hours', completed: false, expiryDays: 30 }, // Source: Public Safety Canada (getprepared.gc.ca)
+        { id: 'blizzard-safety-2', text: 'Have blankets, warm clothing, and hand warmers for extreme cold', completed: false, expiryDays: 30 }, // Source: Canadian Red Cross (redcross.ca)
+        { id: 'blizzard-safety-3', text: 'Prepare for power outages with flashlights, batteries, and a crank radio', completed: false, expiryDays: 30 }, // Source: PreparedBC (preparedbc.ca)
+        { id: 'blizzard-safety-4', text: 'Avoid travel; if stranded in a vehicle, stay inside and run the engine sparingly', completed: false, expiryDays: 30 }, // Source: Canadian Red Cross (redcross.ca)
+        { id: 'blizzard-safety-5', text: 'Check on vulnerable neighbors, especially the elderly or those with medical needs', completed: false, expiryDays: 30 }, // Source: PreparedBC (preparedbc.ca)
       ],
     },
     {
       title: '📡 Monitoring & Insurance',
       items: [
-        { id: 'blizzard-monitor-1', text: 'Sign up for weather alerts and monitor forecasts via apps or radio', completed: false }, // Source: Public Safety Canada (getprepared.gc.ca)
-        { id: 'blizzard-monitor-2', text: 'Review insurance for winter storm damage coverage', completed: false }, // Source: Canadian Red Cross (redcross.ca)
-        { id: 'blizzard-monitor-3', text: 'Document your property with photos for potential claims', completed: false }, // Source: PreparedBC (preparedbc.ca)
-        { id: 'blizzard-monitor-4', text: 'Install winter tires and keep your vehicle maintained', completed: false }, // Source: PreparedBC (preparedbc.ca)
+        { id: 'blizzard-monitor-1', text: 'Sign up for weather alerts and monitor forecasts via apps or radio', completed: false, expiryDays: 30 }, // Source: Public Safety Canada (getprepared.gc.ca)
+        { id: 'blizzard-monitor-2', text: 'Review insurance for winter storm damage coverage', completed: false, expiryDays: 30 }, // Source: Canadian Red Cross (redcross.ca)
+        { id: 'blizzard-monitor-3', text: 'Document your property with photos for potential claims', completed: false, expiryDays: 30 }, // Source: PreparedBC (preparedbc.ca)
+        { id: 'blizzard-monitor-4', text: 'Install winter tires and keep your vehicle maintained', completed: false, expiryDays: 30 }, // Source: PreparedBC (preparedbc.ca)
       ],
     },
   ],

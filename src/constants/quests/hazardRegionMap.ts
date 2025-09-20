@@ -1,8 +1,13 @@
 import { wildfireSmokeQuest } from './hazards/wildfire_smoke';
-// Import other hazard quests here in the future
-// import { blizzardQuest } from './hazards/blizzard';
+import { wildfireQuest } from './hazards/wildfire';
+import { blizzardQuest } from './hazards/blizzard';
+import { floodQuest } from './hazards/flood';
+import { earthquakeQuest } from './hazards/earthquake';
+import { tornadoQuest } from './hazards/tornado';
+import { hurricaneQuest } from './hazards/hurricane';
+import { heatwaveQuest } from './hazards/heatwave';
 
-import type { Quest } from './types';
+import type { Quest } from './questConfig';
 
 /**
  * @file hazardMap.ts
@@ -10,13 +15,118 @@ import type { Quest } from './types';
  * This is the single source of truth for regional personalization.
  */
 
-// A map where the key is the 2-letter province code and the value is an array of quest objects.
 export const hazardMap: Record<string, Quest[]> = {
-  // Provinces with significant wildfire risk now map to the wildfire quest.
-  'AB': [wildfireSmokeQuest],
-  'BC': [wildfireSmokeQuest],
-  'SK': [wildfireSmokeQuest],
-  'MB': [wildfireSmokeQuest],
-  'NT': [wildfireSmokeQuest],
-  'YT': [wildfireSmokeQuest],
+  // British Columbia
+  'BC': [
+    wildfireQuest,
+    wildfireSmokeQuest,
+    earthquakeQuest,
+    floodQuest,
+    heatwaveQuest,
+  ],
+
+  // Alberta
+  'AB': [
+    wildfireQuest,
+    wildfireSmokeQuest,
+    tornadoQuest,
+    floodQuest,
+    blizzardQuest,
+    heatwaveQuest,
+  ],
+
+  // Saskatchewan
+  'SK': [
+    wildfireSmokeQuest,
+    tornadoQuest,
+    floodQuest,
+    blizzardQuest,
+    heatwaveQuest,
+  ],
+
+  // Manitoba
+  'MB': [
+    wildfireSmokeQuest,
+    tornadoQuest,
+    floodQuest,
+    blizzardQuest,
+    heatwaveQuest,
+  ],
+
+  // Ontario
+  'ON': [
+    wildfireSmokeQuest,
+    tornadoQuest,
+    floodQuest,
+    blizzardQuest,
+    heatwaveQuest,
+  ],
+
+  // Quebec
+  'QC': [
+    wildfireSmokeQuest,
+    floodQuest,
+    blizzardQuest,
+    heatwaveQuest,
+  ],
+
+  // New Brunswick
+  'NB': [
+    wildfireSmokeQuest,
+    floodQuest,
+    blizzardQuest,
+    hurricaneQuest,
+    heatwaveQuest,
+  ],
+
+  // Nova Scotia
+  'NS': [
+    wildfireSmokeQuest,
+    floodQuest,
+    blizzardQuest,
+    hurricaneQuest,
+    heatwaveQuest,
+  ],
+
+  // Prince Edward Island
+  'PE': [
+    wildfireSmokeQuest,
+    floodQuest,
+    blizzardQuest,
+    hurricaneQuest,
+    heatwaveQuest,
+  ],
+
+  // Newfoundland and Labrador
+  'NL': [
+    wildfireSmokeQuest,
+    floodQuest,
+    blizzardQuest,
+    hurricaneQuest,
+    heatwaveQuest,
+  ],
+
+  // Yukon
+  'YT': [
+    wildfireQuest,
+    wildfireSmokeQuest,
+    earthquakeQuest,
+    floodQuest,
+    blizzardQuest,
+  ],
+
+  // Northwest Territories
+  'NT': [
+    wildfireQuest,
+    wildfireSmokeQuest,
+    floodQuest,
+    blizzardQuest,
+  ],
+
+  // Nunavut
+  'NU': [
+    wildfireSmokeQuest,
+    floodQuest,
+    blizzardQuest,
+  ],
 };

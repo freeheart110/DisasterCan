@@ -19,10 +19,10 @@ export default function RootLayout() {
         console.log('No user found. Signing in anonymously...');
         await signInAnonymously(auth).catch(console.error);
       } else {
-        console.log('User logged in with UID:', user.uid);
+        // console.log('User logged in with UID:', user.uid);
         const profile = await getUserProfile(user.uid);
         setProfile(profile);
-        console.log('Fetched or created profile:', profile);
+        // console.log('Fetched or created profile:', profile);
       }
     });
     return () => unsubscribe();

@@ -4,9 +4,13 @@ import { auth } from '../../src/firebase/config';
 import { getUserProfile, UserProfile } from '../../src/services/profileService';
 
 const ProfileScreen = () => {
+  // State for holding the user's profile data
   const [profile, setProfile] = useState<UserProfile | null>(null);
+
+  // Loading indicator state
   const [loading, setLoading] = useState(true);
 
+  // Fetch the user profile on component mount
   useEffect(() => {
     const loadProfile = async () => {
       if (auth.currentUser) {
@@ -18,6 +22,7 @@ const ProfileScreen = () => {
     loadProfile();
   }, []);
 
+  // Show a loading spinner while fetching data
   if (loading) {
     return (
       <View style={styles.centered}>
@@ -27,6 +32,7 @@ const ProfileScreen = () => {
     );
   }
 
+  // Handle empty profile (user exists but no profile stored)
   if (!profile) {
     return (
       <View style={styles.centered}>
@@ -35,19 +41,24 @@ const ProfileScreen = () => {
     );
   }
 
+  // Render user profile details
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.header}>👤 Your Profile</Text>
+
+      {/* Level */}
       <View style={styles.card}>
         <Text style={styles.label}>Level:</Text>
         <Text style={styles.value}>{profile.level}</Text>
       </View>
 
+      {/* Points */}
       <View style={styles.card}>
-        <Text style={styles.label}>XP:</Text>
-        <Text style={styles.value}>{profile.xp}</Text>
+        <Text style={styles.label}>Point:</Text>
+        <Text style={styles.value}>{profile.point}</Text>
       </View>
 
+      {/* Badges */}
       <View style={styles.card}>
         <Text style={styles.label}>Badges:</Text>
         {profile.badges.length === 0 ? (
@@ -61,6 +72,7 @@ const ProfileScreen = () => {
         )}
       </View>
 
+      {/* Completed Quests */}
       <View style={styles.card}>
         <Text style={styles.label}>Completed Quests:</Text>
         {Object.keys(profile.completedQuests).length === 0 ? (

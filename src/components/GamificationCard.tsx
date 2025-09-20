@@ -10,20 +10,20 @@ const ProgressBar = ({ progress }: { progress: number }) => (
 );
 
 /**
- * GamificationCard displays the user's XP, level, and progress to the next level.
+ * GamificationCard displays the user's points, level, and progress to the next level.
  * It reads profile data from the global quest store.
  */
 export const GamificationCard = () => {
-  const { userProfile, getXpBarProgress } = useQuestStore();
-  const xpProgress = getXpBarProgress();
+  const { userProfile, getLevelBarProgress } = useQuestStore();
+  const pointProgress = getLevelBarProgress();
 
   if (!userProfile) return null;
 
   // Display name fallback
   const displayName = userProfile.userId || 'Anonymous';
 
-  // Clamp current XP to 0 to avoid negative numbers
-  const currentXp = Math.max(xpProgress.currentXp, 0);
+  // Clamp current points to 0 to avoid negative numbers
+  const currentPoint = Math.max(pointProgress.currentPoint, 0);
 
   return (
     <View style={styles.card}>
@@ -32,12 +32,12 @@ export const GamificationCard = () => {
         <Text style={styles.username}>User: {displayName}</Text>
       </View>
 
-      <Text style={styles.level}>Level {xpProgress.level}</Text>
+      <Text style={styles.level}>Level {pointProgress.level}</Text>
 
-      <ProgressBar progress={xpProgress.progress} />
+      <ProgressBar progress={pointProgress.progress} />
 
       <Text style={styles.progressText}>
-        XP: {currentXp} / {xpProgress.requiredXp}
+        Points: {currentPoint} / {pointProgress.requiredPoint}
       </Text>
     </View>
   );

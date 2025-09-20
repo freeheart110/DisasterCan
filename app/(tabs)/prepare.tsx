@@ -1,66 +1,81 @@
-// import React from 'react';
-// import { View, Text, StyleSheet, TouchableOpacity, FlatList } from 'react-native';
-// import { SafeAreaView } from 'react-native-safe-area-context';
-// import { Link } from 'expo-router';
-// import { Ionicons } from '@expo/vector-icons';
-// import { useQuestStore } from '../../src/state/questStore';
-// import type { Quest } from '../../src/constants/quests/types';
+import React from 'react';
+import { View, Text, StyleSheet, FlatList, ScrollView } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useQuestStore } from '../../src/state/questStore';
+import QuestCard from '../../src/components/QuestCard';
+import type { Quest } from '../../src/constants/quests/questConfig';
 
-// // A reusable component for displaying a single quest card
-// const QuestCard = ({ quest }: { quest: Quest }) => {
-//   const getQuestProgress = useQuestStore(state => state.getQuestProgress);
-//   const progress = getQuestProgress(quest.id);
+export default function PrepareScreen(): React.JSX.Element {
+  // Get all quests from global state (Zustand)
+  const quests = useQuestStore(state => state.quests);
 
-//   return (
-//     <Link href={`/quests/${quest.id}`} asChild>
-//       <TouchableOpacity style={styles.questCard}>
-//         <View>
-//           <Text style={styles.questTitle}>{quest.title}</Text>
-//           <Text style={styles.questProgress}>{progress}% Complete</Text>
-//         </View>
-//         <Ionicons name="chevron-forward" size={24} color="#3498db" />
-//       </TouchableOpacity>
-//     </Link>
-//   );
-// };
+  // Separate quests by their format type
+  const checklistQuests = quests.filter((q: Quest) => q.format === 'checklist');
+  const quizQuests = quests.filter((q: Quest) => q.format === 'quiz');
 
-// export default function PrepareScreen(): React.JSX.Element {
-//   const quests = useQuestStore(state => state.quests);
+  return (
+    <SafeAreaView style={styles.safeArea}>
+      {/* ScrollView allows both lists to be scrolled together */}
+      <ScrollView contentContainerStyle={styles.container}>
+        {/* Screen header */}
+        <Text style={styles.header}>Preparedness Quests</Text>
+        <Text style={styles.subHeader}>
+          Complete these quests to become more resilient.
+        </Text>
 
-//   return (
-//     <SafeAreaView style={styles.safeArea}>
-//       <View style={styles.container}>
-//         <Text style={styles.header}>Preparedness Quests</Text>
-//         <Text style={styles.subHeader}>Complete these quests to become more resilient.</Text>
+        {/* Checklist Quests Section */}
+        {checklistQuests.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionHeader}>Checklists</Text>
+            {checklistQuests.map((quest) => (
+              <QuestCard key={quest.id} quest={quest} />
+            ))}
+          </View>
+        )}
 
-//         <FlatList
-//           data={quests}
-//           keyExtractor={(item) => item.id}
-//           renderItem={({ item }) => <QuestCard quest={item} />}
-//           contentContainerStyle={{ gap: 16 }}
-//         />
-//       </View>
-//     </SafeAreaView>
-//   );
-// }
+        {/* Quiz Quests Section */}
+        {quizQuests.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionHeader}>Quizzes</Text>
+            {quizQuests.map((quest) => (
+              <QuestCard key={quest.id} quest={quest} />
+            ))}
+          </View>
+        )}
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
 
-// const styles = StyleSheet.create({
-//   safeArea: { flex: 1, backgroundColor: '#f4f7f9' },
-//   container: { flex: 1, padding: 20 },
-//   header: { fontSize: 32, fontWeight: 'bold', color: '#2c3e50' },
-//   subHeader: { fontSize: 16, color: '#7f8c8d', marginBottom: 24 },
-//   questCard: {
-//     backgroundColor: '#fff',
-//     borderRadius: 12,
-//     padding: 20,
-//     flexDirection: 'row',
-//     justifyContent: 'space-between',
-//     alignItems: 'center',
-//     shadowColor: '#000',
-//     shadowOpacity: 0.05,
-//     shadowRadius: 10,
-//     elevation: 3,
-//   },
-//   questTitle: { fontSize: 18, fontWeight: '600', color: '#34495e' },
-//   questProgress: { fontSize: 14, color: '#27ae60', marginTop: 4 },
-// });
+const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#f4f7f9',
+  },
+  container: {
+    padding: 20,
+    paddingBottom: 40,
+  },
+  header: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#2c3e50',
+  },
+  subHeader: {
+    fontSize: 16,
+    color: '#7f8c8d',
+    marginBottom: 24,
+  },
+  section: {
+    marginBottom: 32,
+  },
+  sectionHeader: {
+    fontSize: 22,
+    fontWeight: '600',
+    color: '#34495e',
+    marginBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#ccc',
+    paddingBottom: 8,
+  },
+});

@@ -1,7 +1,7 @@
 import { familyPlanQuest } from '../constants/quests/common/familyPlan';
 import { seventyTwoHourKitQuest } from '../constants/quests/common/seventyTwoHourKit';
 import { hazardMap } from '../constants/quests/hazardRegionMap';
-import type { Quest } from '../constants/quests/types';
+import type { Quest } from '../constants/quests/questConfig';
 
 /**
  * @file questService.ts
