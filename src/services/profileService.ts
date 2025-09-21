@@ -1,61 +1,40 @@
-import { doc, setDoc, getDoc, onSnapshot } from 'firebase/firestore';
+import { doc, setDoc, getDoc, onSnapshot, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import type { Quest } from '../constants/quests/questConfig';
 
-/**
- * Represents a single completed checklist item with timestamp and optional expiration data.
- * Used only for checklist-based quests.
- */
 export interface CompletedItem {
-  id: string;                 // The checklist item ID
-  completedAt: string;       // ISO timestamp of when the item was completed
-  expiryDays?: number;       // Number of days before this item expires
+  id: string;
+  completedAt: string;
+  expiryDays?: number;
 }
 
-/**
- * Represents a user's profile and progress in the gamified app.
- */
 export interface UserProfile {
-  userId: string; // Firebase UID
-  point: number;  // Total points earned
-  level: number;  // Current user level
-  badges: string[]; // Achieved badges (if any)
-
+  userId: string;
+  point: number;
+  level: number;
+  badges: string[];
   completedQuests: Record<
-    string, // questId
+    string,
     {
-      /**
-       * Checklist progress: categoryTitle -> array of completed items
-       * Only applicable for checklist quests
-       */
       checklistItems?: Record<string, CompletedItem[]>;
-
-      /**
-       * Quiz progress: list of question IDs the user has completed
-       * Only applicable for quiz quests
-       */
-      completedQuizQuestionIds?: string[];
+      quizCompleted?: boolean;
+      title?: string;
     }
   >;
 }
 
 /**
- * Fetches a user's profile from Firestore.
- * If it doesn't exist, initializes it with default values.
- *
- * @param userId The Firebase UID of the user
- * @returns The full UserProfile object
+ * Loads a user profile or creates it if not found.
  */
 export const getUserProfile = async (userId: string): Promise<UserProfile> => {
   try {
-    console.log('📛 userId passed to getUserProfile:', userId);
     const userDocRef = doc(db, 'users', userId);
     const docSnap = await getDoc(userDocRef);
 
     if (docSnap.exists()) {
-      return docSnap.data() as UserProfile;
+      const data = docSnap.data() as UserProfile;
+      return data;
     } else {
-      // New user: create a default profile
       const defaultProfile: UserProfile = {
         userId,
         point: 0,
@@ -64,6 +43,7 @@ export const getUserProfile = async (userId: string): Promise<UserProfile> => {
         completedQuests: {},
       };
       await setDoc(userDocRef, defaultProfile);
+      console.log('🆕 Created new user profile:', defaultProfile);
       return defaultProfile;
     }
   } catch (error) {
@@ -73,13 +53,7 @@ export const getUserProfile = async (userId: string): Promise<UserProfile> => {
 };
 
 /**
- * Saves checklist quest progress to Firestore using each item's `expiryDays`.
- * Only items that explicitly define `expiryDays` will be saved.
- *
- * Quiz progress is handled separately via markQuestionCompleted().
- *
- * @param userId Firebase UID of the user
- * @param quest The checklist quest to save progress for
+ * Saves checklist quest progress with `expiryDays` tracking.
  */
 export const saveQuestProgress = async (userId: string, quest: Quest) => {
   if (quest.format !== 'checklist' || !quest.categories) {
@@ -88,7 +62,6 @@ export const saveQuestProgress = async (userId: string, quest: Quest) => {
   }
 
   const userDocRef = doc(db, 'users', userId);
-
   const checklistItems: Record<string, CompletedItem[]> = {};
 
   quest.categories.forEach((category) => {
@@ -113,27 +86,82 @@ export const saveQuestProgress = async (userId: string, quest: Quest) => {
     }
   });
 
-  // Save progress to Firestore using merge to avoid overwriting other fields like quiz progress
+  if (Object.keys(checklistItems).length === 0) {
+    console.warn(`⚠️ No completed items to save for "${quest.id}"`);
+    return;
+  }
+
+  const existingDoc = await getDoc(userDocRef);
+  const existingData = existingDoc.exists() ? existingDoc.data() : {};
+  const existingQuest = existingData?.completedQuests?.[quest.id] ?? {};
+
+  const updatedQuestData: any = {
+    checklistItems,
+    title: quest.title,
+  };
+
+  if (existingQuest.quizCompleted !== undefined) {
+    updatedQuestData.quizCompleted = existingQuest.quizCompleted;
+  }
+
+  await setDoc(
+    userDocRef,
+    {
+      completedQuests: {
+        [quest.id]: updatedQuestData,
+      },
+    },
+    { merge: true }
+  );
+
+  console.log(`✅ Saved checklist progress for "${quest.id}"`);
+};
+
+/**
+ * Saves quiz completion flag (full score) for a quiz quest and stores its title.
+ */
+export const saveQuizCompletion = async (userId: string, quest: Quest) => {
+  const userDocRef = doc(db, 'users', userId);
+
   await setDoc(
     userDocRef,
     {
       completedQuests: {
         [quest.id]: {
-          checklistItems, // ✅ stored separately from quiz completions
+          quizCompleted: true,
+          title: quest.title,
         },
       },
     },
     { merge: true }
   );
+
+  console.log(`🎉 Saved quiz completion for "${quest.title}"`);
 };
 
 /**
- * Sets up a real-time listener on the user profile document in Firestore.
- * Whenever the data changes, the callback will be called with the new profile.
- *
- * @param userId Firebase UID of the user
- * @param callback Callback that receives the updated UserProfile
- * @returns A function to unsubscribe from the listener
+ * Saves checklist title only, useful when all items are complete.
+ */
+export const saveChecklistCompletion = async (userId: string, quest: Quest) => {
+  const userDocRef = doc(db, 'users', userId);
+
+  await setDoc(
+    userDocRef,
+    {
+      completedQuests: {
+        [quest.id]: {
+          title: quest.title,
+        },
+      },
+    },
+    { merge: true }
+  );
+
+  console.log(`📝 Saved checklist completion title for "${quest.title}"`);
+};
+
+/**
+ * Real-time listener for profile updates.
  */
 export const onProfileUpdate = (
   userId: string,
@@ -142,7 +170,42 @@ export const onProfileUpdate = (
   const userDocRef = doc(db, 'users', userId);
   return onSnapshot(userDocRef, (doc) => {
     if (doc.exists()) {
-      callback(doc.data() as UserProfile);
+      const profile = doc.data() as UserProfile;
+      console.log('🔄 Real-time update received:', profile);
+      callback(profile);
+    } else {
+      console.warn(`⚠️ No user profile found for ID "${userId}"`);
     }
   });
+};
+
+// Limit updatable fields for type safety
+type UpdatableField = 'point' | 'level' | 'badges' | 'completedQuests';
+
+/**
+ * Generic updater for a single top-level user profile field.
+ */
+export const updateUserProfileField = async (
+  userId: string,
+  field: UpdatableField,
+  value: any
+): Promise<void> => {
+  const userRef = doc(db, 'users', userId);
+  await updateDoc(userRef, { [field]: value });
+  console.log(`✏️ Updated field "${field}" for user "${userId}"`);
+};
+
+/**
+ * Update just the quest title safely (optional helper).
+ */
+export const updateQuestTitleOnly = async (
+  userId: string,
+  questId: string,
+  title: string
+) => {
+  const userRef = doc(db, 'users', userId);
+  await updateDoc(userRef, {
+    [`completedQuests.${questId}.title`]: title,
+  });
+  console.log(`🖊️ Updated title for quest "${questId}" to "${title}"`);
 };

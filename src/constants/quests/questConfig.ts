@@ -1,5 +1,3 @@
-// src/constants/quests/questConfig.ts
-
 // --- Shared Types ---
 
 export type QuestFormat = 'checklist' | 'quiz';

@@ -1,11 +1,6 @@
-/**
- * @file [questId].tsx
- * @description Screen to display and interact with a specific quest (checklist or quiz format).
- */
-
 import React, { useState, useEffect } from 'react';
 import {
-  View, ScrollView, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator
+  View, ScrollView, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
@@ -17,13 +12,7 @@ import { PointPopUp } from '../../src/components/PointPopUp';
 import CompleteCelebration from '../../src/components/CompleteCelebration';
 import { awardPointForChecklistItem, awardPointForQuizAnswer } from '../../src/services/gamificationService';
 
-const ChecklistItemComponent = ({
-  item,
-  onToggle,
-}: {
-  item: ChecklistItem;
-  onToggle: () => void;
-}) => {
+const ChecklistItemComponent = ({ item, onToggle }: { item: ChecklistItem; onToggle: () => void }) => {
   let expiryText = '';
 
   useEffect(() => {
@@ -57,9 +46,7 @@ const ChecklistItemComponent = ({
         <Text style={[styles.itemText, item.completed && styles.itemTextCompleted]}>
           {item.text}
         </Text>
-        {expiryText !== '' && (
-          <Text style={styles.expiryText}>{expiryText}</Text>
-        )}
+        {expiryText !== '' && <Text style={styles.expiryText}>{expiryText}</Text>}
       </View>
     </TouchableOpacity>
   );
@@ -78,11 +65,19 @@ const QuizComponent = ({
 }) => {
   const [selected, setSelected] = useState<Record<number, string>>({});
   const [submitted, setSubmitted] = useState(false);
-  const [allowRetry, setAllowRetry] = useState(false);
   const [localScore, setLocalScore] = useState(0);
 
+  const makeQuizCompleted = useQuestStore((state) => state.makeQuizCompleted);
+  const alreadyCompleted = userProfile?.completedQuests?.[questId]?.quizCompleted === true;
+
+  useEffect(() => {
+    if (alreadyCompleted) {
+      setSubmitted(true);
+    }
+  }, [alreadyCompleted]);
+
   const handleSelect = (index: number, answer: string) => {
-    if (!submitted) {
+    if (!submitted && !alreadyCompleted) {
       setSelected((prev) => ({ ...prev, [index]: answer }));
     }
   };
@@ -91,68 +86,82 @@ const QuizComponent = ({
     let score = 0;
     questions.forEach((q, idx) => {
       const isCorrect = selected[idx] === q.correctAnswer;
-      const alreadyCompleted = userProfile?.completedQuests?.[questId]?.completedItems?.['quiz']?.includes(q.id);
-
-      if (isCorrect && !alreadyCompleted) {
-        score += 1;
-        useQuestStore.getState().markQuestionCompleted(questId, q.id);
-        awardPointForQuizAnswer(userProfile.userId, false); // 1 point per correct
-      }
+      if (isCorrect) score += 1;
     });
 
     setLocalScore(score);
     setSubmitted(true);
-    setAllowRetry(score < questions.length);
-    onScore(score, score === questions.length);
-  };
 
-  const handleRetry = () => {
-    setSelected({});
-    setSubmitted(false);
-    setLocalScore(0);
-    setAllowRetry(false);
+    const fullScore = score === questions.length;
+    const shouldAward = !alreadyCompleted;
+
+    if (shouldAward && score > 0) {
+      for (let i = 0; i < score; i++) {
+        awardPointForQuizAnswer(userProfile.userId, false); // +1 per correct
+      }
+    }
+
+    if (shouldAward && fullScore) {
+      const quest = useQuestStore.getState().quests.find(q => q.id === questId);
+      if (quest) {
+        makeQuizCompleted(quest); 
+      }
+      console.log('🎯 All questions correct! Marking quiz as completed:', questId);
+      awardPointForQuizAnswer(userProfile.userId, true); // +5 bonus
+    }
+
+    onScore(score, fullScore);
   };
 
   return (
     <View style={styles.quizContainer}>
-      {questions.map((q, idx) => (
-        <View key={idx} style={styles.quizCard}>
-          <Text style={styles.question}>{q.question}</Text>
-          {q.options.map((opt, optIdx) => {
-            const isSelected = selected[idx] === opt;
-            const isCorrect = submitted && opt === q.correctAnswer;
-            const isWrong = submitted && isSelected && opt !== q.correctAnswer;
+      {alreadyCompleted && (
+        <Text style={[styles.score, { color: '#999', marginBottom: 12 }]}>
+          ✅ You’ve already completed this quiz
+        </Text>
+      )}
 
-            return (
-              <TouchableOpacity
-                key={optIdx}
-                onPress={() => handleSelect(idx, opt)}
-                style={[
-                  styles.option,
-                  isSelected && styles.optionSelected,
-                  isCorrect && styles.optionCorrect,
-                  isWrong && styles.optionWrong,
-                ]}
-              >
-                <Text style={styles.optionText}>{opt}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      ))}
-      {!submitted ? (
+      {questions.map((q, idx) => {
+        const isSubmitted = submitted || alreadyCompleted;
+        const userAnswer = selected[idx];
+        const isCorrect = isSubmitted && userAnswer === q.correctAnswer;
+        const isWrong = isSubmitted && userAnswer && userAnswer !== q.correctAnswer;
+
+        return (
+          <View key={idx} style={styles.quizCard}>
+            <Text style={styles.question}>{q.question}</Text>
+            {q.options.map((opt, optIdx) => {
+              const isSelected = userAnswer === opt;
+              return (
+                <TouchableOpacity
+                  key={optIdx}
+                  onPress={() => handleSelect(idx, opt)}
+                  disabled={isSubmitted}
+                  style={[
+                    styles.option,
+                    isSelected && styles.optionSelected,
+                    isSubmitted && opt === q.correctAnswer && styles.optionCorrect,
+                    isSubmitted && isSelected && opt !== q.correctAnswer && styles.optionWrong,
+                  ]}
+                >
+                  <Text style={styles.optionText}>{opt}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        );
+      })}
+
+      {!submitted && !alreadyCompleted && (
         <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit}>
           <Text style={styles.submitBtnText}>Submit</Text>
         </TouchableOpacity>
-      ) : (
-        <View>
-          <Text style={styles.score}>You got {localScore} / {questions.length} correct</Text>
-          {allowRetry && (
-            <TouchableOpacity style={styles.submitBtn} onPress={handleRetry}>
-              <Text style={styles.submitBtnText}>Retry</Text>
-            </TouchableOpacity>
-          )}
-        </View>
+      )}
+
+      {submitted && !alreadyCompleted && (
+        <Text style={styles.score}>
+          You got {localScore} / {questions.length} correct
+        </Text>
       )}
     </View>
   );
@@ -161,7 +170,6 @@ const QuizComponent = ({
 export default function QuestDetailScreen(): React.JSX.Element {
   const router = useRouter();
   const { questId } = useLocalSearchParams<{ questId: string }>();
-
   const quests = useQuestStore(state => state.quests);
   const isLoading = useQuestStore(state => state.isLoading);
   const toggleItemCompleted = useQuestStore(state => state.toggleItemCompleted);
@@ -169,7 +177,7 @@ export default function QuestDetailScreen(): React.JSX.Element {
 
   const [popUps, setPopUps] = useState<number[]>([]);
   const [showCelebration, setShowCelebration] = useState(false);
-  const [wasPreviouslyComplete, setWasPreviouslyComplete] = useState(false);
+  const [celebratedQuests, setCelebratedQuests] = useState<Set<string>>(new Set());
 
   const quest: Quest | undefined = quests.find(q => q.id === questId);
 
@@ -181,12 +189,7 @@ export default function QuestDetailScreen(): React.JSX.Element {
   const handleToggleItem = (categoryTitle: string, item: ChecklistItem) => {
     const wasCompleted = item.completed;
     toggleItemCompleted(userProfile!.userId, quest!.id, categoryTitle, item.id);
-
-    if (wasCompleted) {
-      showPointPopUp(-1);
-    } else {
-      showPointPopUp(1);
-    }
+    showPointPopUp(wasCompleted ? -1 : 1);
   };
 
   const handleQuizScore = (points: number, fullScore: boolean) => {
@@ -194,7 +197,6 @@ export default function QuestDetailScreen(): React.JSX.Element {
     if (fullScore) {
       setShowCelebration(true);
       showPointPopUp(5);
-      awardPointForQuizAnswer(userProfile!.userId, true);
     }
   };
 
@@ -203,13 +205,12 @@ export default function QuestDetailScreen(): React.JSX.Element {
       const allItems = quest.categories.flatMap(cat => cat.items);
       const allCompleted = allItems.every(item => item.completed);
 
-      if (allCompleted && !wasPreviouslyComplete) {
+      const alreadyCelebrated = celebratedQuests.has(quest.id);
+
+      if (allCompleted && !alreadyCelebrated) {
         setShowCelebration(true);
         showPointPopUp(5);
-        setWasPreviouslyComplete(true);
-      }
-      if (!allCompleted && wasPreviouslyComplete) {
-        setWasPreviouslyComplete(false);
+        setCelebratedQuests(prev => new Set(prev).add(quest.id));
       }
     }
   }, [quest]);
@@ -281,7 +282,6 @@ export default function QuestDetailScreen(): React.JSX.Element {
     </SafeAreaView>
   );
 }
-
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#f4f7f9' },

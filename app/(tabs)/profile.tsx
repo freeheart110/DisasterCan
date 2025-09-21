@@ -1,28 +1,32 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  ActivityIndicator,
+} from 'react-native';
 import { auth } from '../../src/firebase/config';
 import { getUserProfile, UserProfile } from '../../src/services/profileService';
 
 const ProfileScreen = () => {
-  // State for holding the user's profile data
   const [profile, setProfile] = useState<UserProfile | null>(null);
-
-  // Loading indicator state
   const [loading, setLoading] = useState(true);
 
-  // Fetch the user profile on component mount
   useEffect(() => {
     const loadProfile = async () => {
       if (auth.currentUser) {
         const data = await getUserProfile(auth.currentUser.uid);
         setProfile(data);
+        // console.log('👤 Loaded user profile:', data);
+        // console.log('📘 Completed Quests:', data.completedQuests);
+        console.log('🏅 Badges:', data.badges);
       }
       setLoading(false);
     };
     loadProfile();
   }, []);
 
-  // Show a loading spinner while fetching data
   if (loading) {
     return (
       <View style={styles.centered}>
@@ -32,7 +36,6 @@ const ProfileScreen = () => {
     );
   }
 
-  // Handle empty profile (user exists but no profile stored)
   if (!profile) {
     return (
       <View style={styles.centered}>
@@ -41,20 +44,19 @@ const ProfileScreen = () => {
     );
   }
 
-  // Render user profile details
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.header}>👤 Your Profile</Text>
 
-      {/* Level */}
+      {/* User Level */}
       <View style={styles.card}>
         <Text style={styles.label}>Level:</Text>
         <Text style={styles.value}>{profile.level}</Text>
       </View>
 
-      {/* Points */}
+      {/* Total Points */}
       <View style={styles.card}>
-        <Text style={styles.label}>Point:</Text>
+        <Text style={styles.label}>Points:</Text>
         <Text style={styles.value}>{profile.point}</Text>
       </View>
 
@@ -75,27 +77,41 @@ const ProfileScreen = () => {
       {/* Completed Quests */}
       <View style={styles.card}>
         <Text style={styles.label}>Completed Quests:</Text>
+
         {Object.keys(profile.completedQuests).length === 0 ? (
           <Text style={styles.subText}>No quests completed yet.</Text>
         ) : (
-          Object.entries(profile.completedQuests).map(([questId, questData]) => (
-            <View key={questId} style={styles.quest}>
-              <Text style={styles.questTitle}>📘 {questId}</Text>
+          Object.entries(profile.completedQuests).map(([questId, questData]) => {
+            const hasChecklist =
+              questData.checklistItems &&
+              Object.keys(questData.checklistItems).length > 0;
+            const hasQuiz = questData.quizCompleted === true;
 
-              {questData.checklistItems &&
-                Object.entries(questData.checklistItems).map(([categoryId, items]) => (
-                  <Text key={categoryId} style={styles.subText}>
-                    {categoryId}: {items.length} items
-                  </Text>
-                ))}
-                
-              {questData.completedQuizQuestionIds && (
-                <Text style={styles.subText}>
-                  Quiz: {questData.completedQuizQuestionIds.length} questions completed
-                </Text>
-              )}
-            </View>
-          ))
+            if (!hasChecklist && !hasQuiz) return null;
+
+            const title = questData.title || questId;
+
+            return (
+              <View key={questId} style={styles.quest}>
+                <Text style={styles.questTitle}>📘 {title}</Text>
+
+                {/* Checklist progress */}
+                {hasChecklist &&
+                  Object.entries(questData.checklistItems!).map(
+                    ([categoryId, items]) => (
+                      <Text key={categoryId} style={styles.subText}>
+                        {categoryId}: {items.length} items
+                      </Text>
+                    )
+                  )}
+
+                {/* Quiz completion */}
+                {hasQuiz && (
+                  <Text style={styles.subText}>✅ Quiz: Completed</Text>
+                )}
+              </View>
+            );
+          })
         )}
       </View>
     </ScrollView>

@@ -4,6 +4,9 @@ import {
   getUserProfile,
   saveQuestProgress,
   CompletedItem,
+  saveQuizCompletion,
+  saveChecklistCompletion,
+  updateUserProfileField,
 } from '../services/profileService';
 import {
   awardPointForChecklistItem,
@@ -13,7 +16,6 @@ import {
 import type { UserProfile } from '../services/profileService';
 import type { Quest } from '../constants/quests/questConfig';
 
-// Define the shape of the QuestState managed by Zustand
 interface QuestState {
   quests: Quest[];
   userProfile: UserProfile | null;
@@ -35,9 +37,8 @@ interface QuestState {
   };
   awardPoint: (userId: string, amount: number) => Promise<void>;
   getQuestProgress: (questId: string) => number;
-
-  // New method to track completed quiz questions per quest
-  markQuestionCompleted: (questId: string, questionId: string) => void;
+  makeQuizCompleted: (quest: Quest) => void;
+  makeChecklistCompleted: (quest: Quest) => void;
 }
 
 export const useQuestStore = create<QuestState>((set, get) => ({
@@ -45,10 +46,8 @@ export const useQuestStore = create<QuestState>((set, get) => ({
   userProfile: null,
   isLoading: true,
 
-  // Load quests and initialize progress based on the saved user profile
   async initializeQuests(userId, provinceCode) {
     if (!get().isLoading) return;
-
     const baseQuests = loadQuestsForProvince(provinceCode);
     const profile = await getUserProfile(userId);
     set({ userProfile: profile });
@@ -58,11 +57,8 @@ export const useQuestStore = create<QuestState>((set, get) => ({
     const questsWithProgress = baseQuests.map((quest) => {
       const saved = profile.completedQuests[quest.id];
       if (!saved) return quest;
-
-      // Skip quiz progress (handled separately)
       if (quest.format === 'quiz') return quest;
 
-      // Process checklist quests and mark items as completed or expired
       if (quest.format === 'checklist' && quest.categories) {
         const updatedCategories = quest.categories.map((category) => {
           const savedItems: CompletedItem[] =
@@ -102,7 +98,6 @@ export const useQuestStore = create<QuestState>((set, get) => ({
     set({ quests: questsWithProgress, isLoading: false });
   },
 
-  // Toggle the completion status of a checklist item and update profile/XP
   async toggleItemCompleted(userId, questId, categoryId, itemId) {
     let updatedQuest: Quest | undefined;
     let wasJustCompleted = false;
@@ -132,40 +127,35 @@ export const useQuestStore = create<QuestState>((set, get) => ({
         updatedQuest = { ...quest, categories: newCategories };
         return updatedQuest;
       }
-
       return quest;
     });
 
-    // Save updated quests into store state
     set({ quests: updatedQuests });
 
     if (updatedQuest) {
-      // Save to Firestore
       await saveQuestProgress(userId, updatedQuest);
-
-      // Determine if entire checklist is now completed
       const allItems = updatedQuest.categories?.flatMap((cat) => cat.items) ?? [];
       const allCompleted = allItems.length > 0 && allItems.every((item) => item.completed);
 
-      // Award points based on type: +1 or -1 for single item, +5 if checklist completed
       if (wasJustCompleted) {
-        await awardPointForChecklistItem(userId, allCompleted, false); // normal award
+        await awardPointForChecklistItem(userId, allCompleted, false);
+        if (allCompleted) {
+          console.log(`🎯 All items completed for "${updatedQuest.title}"`);
+          get().makeChecklistCompleted(updatedQuest);
+        }
       } else {
-        await awardPointForChecklistItem(userId, false, true); // subtract 1
+        await awardPointForChecklistItem(userId, false, true);
       }
 
-      // Refresh user profile after awarding points
       const updatedProfile = await getUserProfile(userId);
       set({ userProfile: updatedProfile });
     }
   },
 
-  // Replace the current in-memory profile with a new one
   updateProfile(newProfile) {
     set({ userProfile: newProfile });
   },
 
-  // Return level progress bar values for display in UI
   getLevelBarProgress() {
     const profile = get().userProfile;
     if (!profile) {
@@ -179,12 +169,10 @@ export const useQuestStore = create<QuestState>((set, get) => ({
 
     const totalPoints = profile.point;
     const level = calculateLevel(totalPoints);
-
     const prev = POINTS_FOR_NEXT_LEVEL(Math.max(0, level - 1));
     const next = POINTS_FOR_NEXT_LEVEL(level);
     const earnedThisLevel = totalPoints - prev;
     const required = next - prev;
-
     const progress = Math.round((earnedThisLevel / required) * 100);
 
     return {
@@ -195,53 +183,129 @@ export const useQuestStore = create<QuestState>((set, get) => ({
     };
   },
 
-  // Award a number of points and refresh the user profile
   async awardPoint(userId, amount) {
-    const isComplete = amount > 1; // Treat 5 or more as full completion bonus
+    const isComplete = amount > 1;
     await awardPointForChecklistItem(userId, isComplete);
     const updatedProfile = await getUserProfile(userId);
     set({ userProfile: updatedProfile });
   },
 
-  // Return the percentage of completed checklist items in a given quest
-  getQuestProgress(questId: string) {
-    const quest = get().quests.find((q) => q.id === questId);
-    if (!quest || quest.format !== 'checklist' || !quest.categories) return 0;
+  getQuestProgress: (questId: string) => {
+    const { quests, userProfile } = get();
+    const quest = quests.find((q) => q.id === questId);
+    if (!quest || !userProfile) return 0;
 
-    const total = quest.categories.reduce((sum, c) => sum + c.items.length, 0);
-    const done = quest.categories.reduce(
-      (sum, c) => sum + c.items.filter((i) => i.completed).length,
-      0
-    );
-
-    return total > 0 ? Math.round((done / total) * 100) : 0;
+    const completedQuest = userProfile.completedQuests?.[questId];
+    if (quest.format === 'quiz') {
+      return completedQuest?.quizCompleted ? 100 : 0;
+    }
+    if (quest.format === 'checklist' && quest.categories) {
+      const totalItems = quest.categories.reduce((count, cat) => count + cat.items.length, 0);
+      const completedItems = quest.categories.reduce((count, cat) => {
+        const categoryId = cat.title;
+        const items = completedQuest?.checklistItems?.[categoryId] || [];
+        return count + items.length;
+      }, 0);
+      return totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
+    }
+    return 0;
   },
 
-  // Mark a specific quiz question as completed to prevent awarding again
-  markQuestionCompleted(questId, questionId) {
+  makeChecklistCompleted(quest: Quest) {
     const { userProfile } = get();
     if (!userProfile) return;
 
-    // Get previously completed quiz question IDs for this quest
-    const prevIds =
-      userProfile.completedQuests?.[questId]?.completedQuizQuestionIds || [];
+    const prevData = userProfile.completedQuests?.[quest.id] || {};
+    const hasChecklist = !!prevData.checklistItems;
+    if (!hasChecklist) return;
 
-    // Do nothing if already completed
-    if (prevIds.includes(questionId)) return;
-
-    // Construct updated profile with new quiz question ID added
     const updatedProfile: UserProfile = {
       ...userProfile,
       completedQuests: {
         ...userProfile.completedQuests,
-        [questId]: {
-          ...userProfile.completedQuests[questId],
-          completedQuizQuestionIds: [...prevIds, questionId],
+        [quest.id]: {
+          ...prevData,
+          title: quest.title,
+          checklistItems: prevData.checklistItems,
         },
       },
     };
 
-    // Save updated profile to Zustand store
     set({ userProfile: updatedProfile });
+    saveChecklistCompletion(userProfile.userId, quest);
+    evaluateAndAssignBadges(userProfile.userId);
+    console.log(`✅ Title added to checklist quest "${quest.title}" (ID: ${quest.id})`);
+  },
+
+  makeQuizCompleted(quest: Quest) {
+    const { userProfile } = get();
+    if (!userProfile) return;
+
+    const alreadyCompleted = userProfile.completedQuests?.[quest.id]?.quizCompleted === true;
+    if (alreadyCompleted) return;
+
+    const updatedProfile: UserProfile = {
+      ...userProfile,
+      completedQuests: {
+        ...userProfile.completedQuests,
+        [quest.id]: {
+          ...userProfile.completedQuests[quest.id],
+          title: quest.title,
+          quizCompleted: true,
+        },
+      },
+    };
+
+    set({ userProfile: updatedProfile });
+    saveQuizCompletion(userProfile.userId, quest);
+    evaluateAndAssignBadges(userProfile.userId);
   },
 }));
+
+export const evaluateAndAssignBadges = async (userId: string) => {
+  const state = useQuestStore.getState();
+  const profile = state.userProfile;
+  const allQuests = state.quests;
+  if (!profile) return;
+
+  const completed = profile.completedQuests || {};
+  const earnedBadges: string[] = [];
+
+  const commonChecklistCount = Object.entries(completed).filter(([questId, data]) => {
+    const quest = allQuests.find((q) => q.id === questId);
+    const isChecklistComplete =
+      quest?.format === 'checklist' &&
+      quest?.category === 'common' &&
+      quest.categories?.every((cat) => cat.items.every((item) => item.completed));
+    return isChecklistComplete;
+  }).length;
+
+  if (commonChecklistCount >= 2 && !profile.badges.includes('Preparedness Champion')) {
+    earnedBadges.push('Preparedness Champion');
+  }
+
+  Object.entries(completed).forEach(([questId, data]) => {
+    const quest = allQuests.find((q) => q.id === questId);
+    if (!quest || quest.category !== 'hazard') return;
+
+    const hasChecklist =
+      quest.format === 'checklist' &&
+      quest.categories?.every((cat) => cat.items.every((item) => item.completed));
+
+    const hasQuiz = data.quizCompleted === true;
+
+    if (hasChecklist && hasQuiz) {
+      const hazardBadge = `${quest.title} Ready`;
+      if (!profile.badges.includes(hazardBadge)) {
+        earnedBadges.push(hazardBadge);
+      }
+    }
+  });
+
+  if (earnedBadges.length > 0) {
+    const updatedBadges = [...profile.badges, ...earnedBadges];
+    await updateUserProfileField(userId, 'badges', updatedBadges);
+    useQuestStore.setState({ userProfile: { ...profile, badges: updatedBadges } });
+    console.log('🏅 New badges awarded:', earnedBadges);
+  }
+};

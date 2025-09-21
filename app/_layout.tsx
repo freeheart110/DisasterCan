@@ -29,7 +29,7 @@ export default function RootLayout() {
   }, []);
   useEffect(() => {
   if (profile) {
-    console.log( 'Profile state updated:', profile);
+    // console.log( 'Profile state updated:', profile);
   }
 }, [profile]);
   // Load regional quests after profile and location are ready
