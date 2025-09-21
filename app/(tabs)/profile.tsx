@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -6,40 +6,18 @@ import {
   ScrollView,
   ActivityIndicator,
 } from 'react-native';
-import { auth } from '../../src/firebase/config';
-import { getUserProfile, UserProfile } from '../../src/services/profileService';
+import { getEarnedBadges } from '../../src/services/badgeService';
+import { useQuestStore } from '../../src/state/questStore'; // Zustand store
 
 const ProfileScreen = () => {
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const loadProfile = async () => {
-      if (auth.currentUser) {
-        const data = await getUserProfile(auth.currentUser.uid);
-        setProfile(data);
-        // console.log('👤 Loaded user profile:', data);
-        // console.log('📘 Completed Quests:', data.completedQuests);
-        console.log('🏅 Badges:', data.badges);
-      }
-      setLoading(false);
-    };
-    loadProfile();
-  }, []);
-
-  if (loading) {
-    return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" />
-        <Text>Loading profile...</Text>
-      </View>
-    );
-  }
+  const profile = useQuestStore((s) => s.userProfile); // Use Zustand
+  const badges = profile ? getEarnedBadges(profile) : [];
 
   if (!profile) {
     return (
       <View style={styles.centered}>
-        <Text>No profile data found.</Text>
+        <ActivityIndicator size="large" />
+        <Text>Loading profile...</Text>
       </View>
     );
   }
@@ -63,10 +41,10 @@ const ProfileScreen = () => {
       {/* Badges */}
       <View style={styles.card}>
         <Text style={styles.label}>Badges:</Text>
-        {profile.badges.length === 0 ? (
+        {badges.length === 0 ? (
           <Text style={styles.subText}>No badges yet. Start exploring!</Text>
         ) : (
-          profile.badges.map((badge, index) => (
+          badges.map((badge, index) => (
             <Text key={index} style={styles.badge}>
               🏅 {badge}
             </Text>
@@ -76,7 +54,7 @@ const ProfileScreen = () => {
 
       {/* Completed Quests */}
       <View style={styles.card}>
-        <Text style={styles.label}>Completed Quests:</Text>
+        <Text style={styles.label}>Quests Progress:</Text>
 
         {Object.keys(profile.completedQuests).length === 0 ? (
           <Text style={styles.subText}>No quests completed yet.</Text>

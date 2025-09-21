@@ -15,12 +15,15 @@ import {
 } from '../services/gamificationService';
 import type { UserProfile } from '../services/profileService';
 import type { Quest } from '../constants/quests/questConfig';
+import { getEarnedBadges } from '../services/badgeService';
 
+// Zustand store interface
 interface QuestState {
-  quests: Quest[];
-  userProfile: UserProfile | null;
-  isLoading: boolean;
+  quests: Quest[]; // All loaded quests
+  userProfile: UserProfile | null; // Fetched user profile
+  isLoading: boolean; // Loading flag
 
+  // Actions
   initializeQuests: (userId: string, provinceCode: string) => Promise<void>;
   toggleItemCompleted: (
     userId: string,
@@ -46,8 +49,10 @@ export const useQuestStore = create<QuestState>((set, get) => ({
   userProfile: null,
   isLoading: true,
 
+  // Load quests and initialize user progress
   async initializeQuests(userId, provinceCode) {
     if (!get().isLoading) return;
+
     const baseQuests = loadQuestsForProvince(provinceCode);
     const profile = await getUserProfile(userId);
     set({ userProfile: profile });
@@ -57,6 +62,7 @@ export const useQuestStore = create<QuestState>((set, get) => ({
     const questsWithProgress = baseQuests.map((quest) => {
       const saved = profile.completedQuests[quest.id];
       if (!saved) return quest;
+
       if (quest.format === 'quiz') return quest;
 
       if (quest.format === 'checklist' && quest.categories) {
@@ -98,6 +104,7 @@ export const useQuestStore = create<QuestState>((set, get) => ({
     set({ quests: questsWithProgress, isLoading: false });
   },
 
+  // Toggle a checklist item and update backend
   async toggleItemCompleted(userId, questId, categoryId, itemId) {
     let updatedQuest: Quest | undefined;
     let wasJustCompleted = false;
@@ -132,13 +139,16 @@ export const useQuestStore = create<QuestState>((set, get) => ({
 
     set({ quests: updatedQuests });
 
+    // Save updated checklist to Firestore
     if (updatedQuest) {
       await saveQuestProgress(userId, updatedQuest);
+
       const allItems = updatedQuest.categories?.flatMap((cat) => cat.items) ?? [];
       const allCompleted = allItems.length > 0 && allItems.every((item) => item.completed);
 
       if (wasJustCompleted) {
         await awardPointForChecklistItem(userId, allCompleted, false);
+
         if (allCompleted) {
           console.log(`🎯 All items completed for "${updatedQuest.title}"`);
           get().makeChecklistCompleted(updatedQuest);
@@ -152,10 +162,12 @@ export const useQuestStore = create<QuestState>((set, get) => ({
     }
   },
 
+  // Manually update the profile in store
   updateProfile(newProfile) {
     set({ userProfile: newProfile });
   },
 
+  // Level bar UI helper
   getLevelBarProgress() {
     const profile = get().userProfile;
     if (!profile) {
@@ -183,6 +195,7 @@ export const useQuestStore = create<QuestState>((set, get) => ({
     };
   },
 
+  // Award generic points and update profile
   async awardPoint(userId, amount) {
     const isComplete = amount > 1;
     await awardPointForChecklistItem(userId, isComplete);
@@ -190,6 +203,7 @@ export const useQuestStore = create<QuestState>((set, get) => ({
     set({ userProfile: updatedProfile });
   },
 
+  // Compute quest progress percentage
   getQuestProgress: (questId: string) => {
     const { quests, userProfile } = get();
     const quest = quests.find((q) => q.id === questId);
@@ -199,6 +213,7 @@ export const useQuestStore = create<QuestState>((set, get) => ({
     if (quest.format === 'quiz') {
       return completedQuest?.quizCompleted ? 100 : 0;
     }
+
     if (quest.format === 'checklist' && quest.categories) {
       const totalItems = quest.categories.reduce((count, cat) => count + cat.items.length, 0);
       const completedItems = quest.categories.reduce((count, cat) => {
@@ -208,9 +223,11 @@ export const useQuestStore = create<QuestState>((set, get) => ({
       }, 0);
       return totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
     }
+
     return 0;
   },
 
+  // Mark a checklist quest as fully completed
   makeChecklistCompleted(quest: Quest) {
     const { userProfile } = get();
     if (!userProfile) return;
@@ -234,9 +251,9 @@ export const useQuestStore = create<QuestState>((set, get) => ({
     set({ userProfile: updatedProfile });
     saveChecklistCompletion(userProfile.userId, quest);
     evaluateAndAssignBadges(userProfile.userId);
-    console.log(`✅ Title added to checklist quest "${quest.title}" (ID: ${quest.id})`);
   },
 
+  // Mark a quiz quest as completed
   makeQuizCompleted(quest: Quest) {
     const { userProfile } = get();
     if (!userProfile) return;
@@ -262,50 +279,23 @@ export const useQuestStore = create<QuestState>((set, get) => ({
   },
 }));
 
+// Evaluate and assign badges, and update Firestore + state if changed
 export const evaluateAndAssignBadges = async (userId: string) => {
   const state = useQuestStore.getState();
   const profile = state.userProfile;
-  const allQuests = state.quests;
   if (!profile) return;
 
-  const completed = profile.completedQuests || {};
-  const earnedBadges: string[] = [];
+  const earnedBadges = getEarnedBadges(profile);
 
-  const commonChecklistCount = Object.entries(completed).filter(([questId, data]) => {
-    const quest = allQuests.find((q) => q.id === questId);
-    const isChecklistComplete =
-      quest?.format === 'checklist' &&
-      quest?.category === 'common' &&
-      quest.categories?.every((cat) => cat.items.every((item) => item.completed));
-    return isChecklistComplete;
-  }).length;
+  const existing = profile.badges || [];
+  const changed =
+    JSON.stringify([...existing].sort()) !== JSON.stringify([...earnedBadges].sort());
 
-  if (commonChecklistCount >= 2 && !profile.badges.includes('Preparedness Champion')) {
-    earnedBadges.push('Preparedness Champion');
-  }
-
-  Object.entries(completed).forEach(([questId, data]) => {
-    const quest = allQuests.find((q) => q.id === questId);
-    if (!quest || quest.category !== 'hazard') return;
-
-    const hasChecklist =
-      quest.format === 'checklist' &&
-      quest.categories?.every((cat) => cat.items.every((item) => item.completed));
-
-    const hasQuiz = data.quizCompleted === true;
-
-    if (hasChecklist && hasQuiz) {
-      const hazardBadge = `${quest.title} Ready`;
-      if (!profile.badges.includes(hazardBadge)) {
-        earnedBadges.push(hazardBadge);
-      }
-    }
-  });
-
-  if (earnedBadges.length > 0) {
-    const updatedBadges = [...profile.badges, ...earnedBadges];
-    await updateUserProfileField(userId, 'badges', updatedBadges);
-    useQuestStore.setState({ userProfile: { ...profile, badges: updatedBadges } });
-    console.log('🏅 New badges awarded:', earnedBadges);
+  if (changed) {
+    await updateUserProfileField(userId, 'badges', earnedBadges);
+    useQuestStore.setState({
+      userProfile: { ...profile, badges: earnedBadges },
+    });
+    console.log('🏅 Updated badges in Firestore:', earnedBadges);
   }
 };

@@ -114,7 +114,7 @@ export const saveQuestProgress = async (userId: string, quest: Quest) => {
     { merge: true }
   );
 
-  console.log(`✅ Saved checklist progress for "${quest.id}"`);
+  // console.log(`Saved checklist progress for "${quest.id}"`);
 };
 
 /**
@@ -171,7 +171,7 @@ export const onProfileUpdate = (
   return onSnapshot(userDocRef, (doc) => {
     if (doc.exists()) {
       const profile = doc.data() as UserProfile;
-      console.log('🔄 Real-time update received:', profile);
+      // console.log(' Real-time update received:', profile);
       callback(profile);
     } else {
       console.warn(`⚠️ No user profile found for ID "${userId}"`);
@@ -193,19 +193,4 @@ export const updateUserProfileField = async (
   const userRef = doc(db, 'users', userId);
   await updateDoc(userRef, { [field]: value });
   console.log(`✏️ Updated field "${field}" for user "${userId}"`);
-};
-
-/**
- * Update just the quest title safely (optional helper).
- */
-export const updateQuestTitleOnly = async (
-  userId: string,
-  questId: string,
-  title: string
-) => {
-  const userRef = doc(db, 'users', userId);
-  await updateDoc(userRef, {
-    [`completedQuests.${questId}.title`]: title,
-  });
-  console.log(`🖊️ Updated title for quest "${questId}" to "${title}"`);
 };

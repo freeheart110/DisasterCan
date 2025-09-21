@@ -11,18 +11,10 @@ import type { ChecklistItem, QuizQuestion, Quest } from '../../src/constants/que
 import { PointPopUp } from '../../src/components/PointPopUp';
 import CompleteCelebration from '../../src/components/CompleteCelebration';
 import { awardPointForChecklistItem, awardPointForQuizAnswer } from '../../src/services/gamificationService';
+import { getEarnedBadges } from '../../src/services/badgeService';
 
 const ChecklistItemComponent = ({ item, onToggle }: { item: ChecklistItem; onToggle: () => void }) => {
   let expiryText = '';
-
-  useEffect(() => {
-    if (item.completed) {
-      console.log('✅ DEBUG: Checked item', item.id, {
-        completedAt: item.completedAt,
-        expiryDays: item.expiryDays,
-      });
-    }
-  }, [item.completed]);
 
   if (item.completed && item.completedAt) {
     const now = new Date();
@@ -97,17 +89,16 @@ const QuizComponent = ({
 
     if (shouldAward && score > 0) {
       for (let i = 0; i < score; i++) {
-        awardPointForQuizAnswer(userProfile.userId, false); // +1 per correct
+        awardPointForQuizAnswer(userProfile.userId, false);
       }
     }
 
     if (shouldAward && fullScore) {
-      const quest = useQuestStore.getState().quests.find(q => q.id === questId);
+      const quest = useQuestStore.getState().quests.find((q) => q.id === questId);
       if (quest) {
-        makeQuizCompleted(quest); 
+        makeQuizCompleted(quest);
       }
-      console.log('🎯 All questions correct! Marking quiz as completed:', questId);
-      awardPointForQuizAnswer(userProfile.userId, true); // +5 bonus
+      awardPointForQuizAnswer(userProfile.userId, true);
     }
 
     onScore(score, fullScore);
@@ -116,9 +107,7 @@ const QuizComponent = ({
   return (
     <View style={styles.quizContainer}>
       {alreadyCompleted && (
-        <Text style={[styles.score, { color: '#999', marginBottom: 12 }]}>
-          ✅ You’ve already completed this quiz
-        </Text>
+        <Text style={[styles.score, { color: '#999', marginBottom: 12 }]}>✅ You’ve already completed this quiz</Text>
       )}
 
       {questions.map((q, idx) => {
@@ -170,16 +159,17 @@ const QuizComponent = ({
 export default function QuestDetailScreen(): React.JSX.Element {
   const router = useRouter();
   const { questId } = useLocalSearchParams<{ questId: string }>();
-  const quests = useQuestStore(state => state.quests);
-  const isLoading = useQuestStore(state => state.isLoading);
-  const toggleItemCompleted = useQuestStore(state => state.toggleItemCompleted);
-  const userProfile = useQuestStore(state => state.userProfile);
+  const quests = useQuestStore((state) => state.quests);
+  const isLoading = useQuestStore((state) => state.isLoading);
+  const toggleItemCompleted = useQuestStore((state) => state.toggleItemCompleted);
+  const userProfile = useQuestStore((state) => state.userProfile);
 
   const [popUps, setPopUps] = useState<number[]>([]);
   const [showCelebration, setShowCelebration] = useState(false);
   const [celebratedQuests, setCelebratedQuests] = useState<Set<string>>(new Set());
+  const [celebrationMessage, setCelebrationMessage] = useState<string>('🎉 +5 Bonus points for finishing the quest!');
 
-  const quest: Quest | undefined = quests.find(q => q.id === questId);
+  const quest: Quest | undefined = quests.find((q) => q.id === questId);
 
   const showPointPopUp = (value: number) => {
     setPopUps((prev) => [...prev, value]);
@@ -195,28 +185,39 @@ export default function QuestDetailScreen(): React.JSX.Element {
   const handleQuizScore = (points: number, fullScore: boolean) => {
     if (points > 0) showPointPopUp(points);
     if (fullScore) {
+      checkBadgeEarned();
       setShowCelebration(true);
       showPointPopUp(5);
     }
   };
 
+  const checkBadgeEarned = () => {
+    const profile = useQuestStore.getState().userProfile;
+      if (!profile) return;
+    const oldBadges = profile?.badges || [];
+    const newBadges = getEarnedBadges(profile);
+    const newlyEarned = newBadges.filter((badge) => !oldBadges.includes(badge));
+    if (newlyEarned.length > 0) {
+      setCelebrationMessage(`🎉 +5 bonus Points for finishing this quest and 🏅 Badge Earned: ${newlyEarned[0]} for completing both family plan and 72 hour kit`);
+    }
+  };
+
   useEffect(() => {
     if (quest?.format === 'checklist' && quest.categories) {
-      const allItems = quest.categories.flatMap(cat => cat.items);
-      const allCompleted = allItems.every(item => item.completed);
-
+      const allItems = quest.categories.flatMap((cat) => cat.items);
+      const allCompleted = allItems.every((item) => item.completed);
       const alreadyCelebrated = celebratedQuests.has(quest.id);
 
       if (allCompleted && !alreadyCelebrated) {
+        checkBadgeEarned();
         setShowCelebration(true);
         showPointPopUp(5);
-        setCelebratedQuests(prev => new Set(prev).add(quest.id));
+        setCelebratedQuests((prev) => new Set(prev).add(quest.id));
       }
     }
   }, [quest]);
 
   if (isLoading) return <ActivityIndicator style={{ flex: 1 }} />;
-
   if (!quest || !userProfile) {
     return (
       <SafeAreaView style={styles.safeArea}>
@@ -240,7 +241,7 @@ export default function QuestDetailScreen(): React.JSX.Element {
 
       {showCelebration && (
         <CompleteCelebration
-          message="🎉 +5 Points for finishing the checklist!"
+          message={celebrationMessage}
           onComplete={() => setShowCelebration(false)}
         />
       )}
