@@ -6,6 +6,7 @@ import { earthquakeQuest } from './hazards/earthquake';
 import { tornadoQuest } from './hazards/tornado';
 import { hurricaneQuest } from './hazards/hurricane';
 import { heatwaveQuest } from './hazards/heatwave';
+import { airQualityQuiz } from './quiz/air_quality_quiz';
 
 import type { Quest } from './questConfig';
 
@@ -23,6 +24,7 @@ export const hazardMap: Record<string, Quest[]> = {
     earthquakeQuest,
     floodQuest,
     heatwaveQuest,
+    airQualityQuiz,
   ],
 
   // Alberta
@@ -42,6 +44,7 @@ export const hazardMap: Record<string, Quest[]> = {
     floodQuest,
     blizzardQuest,
     heatwaveQuest,
+    airQualityQuiz,
   ],
 
   // Manitoba

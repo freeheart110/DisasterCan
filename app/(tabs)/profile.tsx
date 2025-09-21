@@ -81,11 +81,19 @@ const ProfileScreen = () => {
           Object.entries(profile.completedQuests).map(([questId, questData]) => (
             <View key={questId} style={styles.quest}>
               <Text style={styles.questTitle}>📘 {questId}</Text>
-              {Object.entries(questData.completedItems).map(([categoryId, items]) => (
-                <Text key={categoryId} style={styles.subText}>
-                  {categoryId}: {items.length} items
+
+              {questData.checklistItems &&
+                Object.entries(questData.checklistItems).map(([categoryId, items]) => (
+                  <Text key={categoryId} style={styles.subText}>
+                    {categoryId}: {items.length} items
+                  </Text>
+                ))}
+                
+              {questData.completedQuizQuestionIds && (
+                <Text style={styles.subText}>
+                  Quiz: {questData.completedQuizQuestionIds.length} questions completed
                 </Text>
-              ))}
+              )}
             </View>
           ))
         )}

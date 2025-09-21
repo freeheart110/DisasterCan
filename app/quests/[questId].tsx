@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator
+  View, ScrollView, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
@@ -15,11 +15,8 @@ import { useQuestStore } from '../../src/state/questStore';
 import type { ChecklistItem, QuizQuestion, Quest } from '../../src/constants/quests/questConfig';
 import { PointPopUp } from '../../src/components/PointPopUp';
 import CompleteCelebration from '../../src/components/CompleteCelebration';
+import { awardPointForChecklistItem, awardPointForQuizAnswer } from '../../src/services/gamificationService';
 
-/**
- * UI component for a single checklist item.
- * Shows checkbox, text, and expiry info if completed.
- */
 const ChecklistItemComponent = ({
   item,
   onToggle,
@@ -29,7 +26,6 @@ const ChecklistItemComponent = ({
 }) => {
   let expiryText = '';
 
-  // 🔍 DEBUG: Log to check if expiryDays is attached
   useEffect(() => {
     if (item.completed) {
       console.log('✅ DEBUG: Checked item', item.id, {
@@ -38,7 +34,6 @@ const ChecklistItemComponent = ({
       });
     }
   }, [item.completed]);
-  
 
   if (item.completed && item.completedAt) {
     const now = new Date();
@@ -70,13 +65,21 @@ const ChecklistItemComponent = ({
   );
 };
 
-/**
- * Quiz component for quiz quests.
- * Handles answer selection, scoring, and feedback display.
- */
-const QuizComponent = ({ questions }: { questions: QuizQuestion[] }) => {
+const QuizComponent = ({
+  questions,
+  questId,
+  userProfile,
+  onScore,
+}: {
+  questions: QuizQuestion[];
+  questId: string;
+  userProfile: any;
+  onScore: (points: number, bonus: boolean) => void;
+}) => {
   const [selected, setSelected] = useState<Record<number, string>>({});
   const [submitted, setSubmitted] = useState(false);
+  const [allowRetry, setAllowRetry] = useState(false);
+  const [localScore, setLocalScore] = useState(0);
 
   const handleSelect = (index: number, answer: string) => {
     if (!submitted) {
@@ -84,9 +87,31 @@ const QuizComponent = ({ questions }: { questions: QuizQuestion[] }) => {
     }
   };
 
-  const score = questions.reduce((acc, q, idx) => {
-    return acc + (selected[idx] === q.correctAnswer ? 1 : 0);
-  }, 0);
+  const handleSubmit = () => {
+    let score = 0;
+    questions.forEach((q, idx) => {
+      const isCorrect = selected[idx] === q.correctAnswer;
+      const alreadyCompleted = userProfile?.completedQuests?.[questId]?.completedItems?.['quiz']?.includes(q.id);
+
+      if (isCorrect && !alreadyCompleted) {
+        score += 1;
+        useQuestStore.getState().markQuestionCompleted(questId, q.id);
+        awardPointForQuizAnswer(userProfile.userId, false); // 1 point per correct
+      }
+    });
+
+    setLocalScore(score);
+    setSubmitted(true);
+    setAllowRetry(score < questions.length);
+    onScore(score, score === questions.length);
+  };
+
+  const handleRetry = () => {
+    setSelected({});
+    setSubmitted(false);
+    setLocalScore(0);
+    setAllowRetry(false);
+  };
 
   return (
     <View style={styles.quizContainer}>
@@ -106,7 +131,7 @@ const QuizComponent = ({ questions }: { questions: QuizQuestion[] }) => {
                   styles.option,
                   isSelected && styles.optionSelected,
                   isCorrect && styles.optionCorrect,
-                  isWrong && styles.optionWrong
+                  isWrong && styles.optionWrong,
                 ]}
               >
                 <Text style={styles.optionText}>{opt}</Text>
@@ -116,20 +141,23 @@ const QuizComponent = ({ questions }: { questions: QuizQuestion[] }) => {
         </View>
       ))}
       {!submitted ? (
-        <TouchableOpacity style={styles.submitBtn} onPress={() => setSubmitted(true)}>
+        <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit}>
           <Text style={styles.submitBtnText}>Submit</Text>
         </TouchableOpacity>
       ) : (
-        <Text style={styles.score}>You got {score} / {questions.length} correct</Text>
+        <View>
+          <Text style={styles.score}>You got {localScore} / {questions.length} correct</Text>
+          {allowRetry && (
+            <TouchableOpacity style={styles.submitBtn} onPress={handleRetry}>
+              <Text style={styles.submitBtnText}>Retry</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       )}
     </View>
   );
 };
 
-/**
- * Main screen to render a specific quest (by ID).
- * Supports both checklist and quiz quest types.
- */
 export default function QuestDetailScreen(): React.JSX.Element {
   const router = useRouter();
   const { questId } = useLocalSearchParams<{ questId: string }>();
@@ -141,7 +169,6 @@ export default function QuestDetailScreen(): React.JSX.Element {
 
   const [popUps, setPopUps] = useState<number[]>([]);
   const [showCelebration, setShowCelebration] = useState(false);
-  const [hasAwardedBonus, setHasAwardedBonus] = useState(false);
   const [wasPreviouslyComplete, setWasPreviouslyComplete] = useState(false);
 
   const quest: Quest | undefined = quests.find(q => q.id === questId);
@@ -154,7 +181,21 @@ export default function QuestDetailScreen(): React.JSX.Element {
   const handleToggleItem = (categoryTitle: string, item: ChecklistItem) => {
     const wasCompleted = item.completed;
     toggleItemCompleted(userProfile!.userId, quest!.id, categoryTitle, item.id);
-    showPointPopUp(wasCompleted ? -1 : 1);
+
+    if (wasCompleted) {
+      showPointPopUp(-1);
+    } else {
+      showPointPopUp(1);
+    }
+  };
+
+  const handleQuizScore = (points: number, fullScore: boolean) => {
+    if (points > 0) showPointPopUp(points);
+    if (fullScore) {
+      setShowCelebration(true);
+      showPointPopUp(5);
+      awardPointForQuizAnswer(userProfile!.userId, true);
+    }
   };
 
   useEffect(() => {
@@ -164,19 +205,16 @@ export default function QuestDetailScreen(): React.JSX.Element {
 
       if (allCompleted && !wasPreviouslyComplete) {
         setShowCelebration(true);
-        showPointPopUp(5); // Bonus
+        showPointPopUp(5);
         setWasPreviouslyComplete(true);
       }
-
       if (!allCompleted && wasPreviouslyComplete) {
         setWasPreviouslyComplete(false);
       }
     }
   }, [quest]);
 
-  if (isLoading) {
-    return <ActivityIndicator style={{ flex: 1 }} />;
-  }
+  if (isLoading) return <ActivityIndicator style={{ flex: 1 }} />;
 
   if (!quest || !userProfile) {
     return (
@@ -188,7 +226,6 @@ export default function QuestDetailScreen(): React.JSX.Element {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      {/* Header */}
       <Stack.Screen
         options={{
           headerTitle: quest.title,
@@ -200,7 +237,6 @@ export default function QuestDetailScreen(): React.JSX.Element {
         }}
       />
 
-      {/* 🎉 Confetti Celebration */}
       {showCelebration && (
         <CompleteCelebration
           message="🎉 +5 Points for finishing the checklist!"
@@ -208,12 +244,10 @@ export default function QuestDetailScreen(): React.JSX.Element {
         />
       )}
 
-      {/* Floating +1/-1 popups */}
       {popUps.map((value, index) => (
         <PointPopUp key={index} value={value} />
       ))}
 
-      {/* Checklist View */}
       {quest.format === 'checklist' && quest.categories && (
         <FlatList
           data={quest.categories}
@@ -234,13 +268,20 @@ export default function QuestDetailScreen(): React.JSX.Element {
         />
       )}
 
-      {/* Quiz View */}
       {quest.format === 'quiz' && quest.quiz && (
-        <QuizComponent questions={quest.quiz.questions} />
+        <ScrollView contentContainerStyle={styles.quizContainer}>
+          <QuizComponent
+            questions={quest.quiz.questions}
+            questId={quest.id}
+            userProfile={userProfile}
+            onScore={handleQuizScore}
+          />
+        </ScrollView>
       )}
     </SafeAreaView>
   );
 }
+
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#f4f7f9' },

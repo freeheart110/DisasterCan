@@ -124,7 +124,7 @@ export const seventyTwoHourKitQuest: Quest = {
           id: 'docs-3',
           text: 'Cash in small bills and coins',
           completed: false,
-          expiryDays: 0, // Source: Public Safety Canada (getprepared.gc.ca) – No expiry, review as needed
+          expiryDays: 365, // Source: Public Safety Canada (getprepared.gc.ca) – No expiry, review as needed
         },
         {
           id: 'docs-4',

@@ -3,33 +3,46 @@ import { db } from '../firebase/config';
 import type { Quest } from '../constants/quests/questConfig';
 
 /**
- * Represents a single completed checklist item with timestamp and expiration data.
+ * Represents a single completed checklist item with timestamp and optional expiration data.
+ * Used only for checklist-based quests.
  */
 export interface CompletedItem {
   id: string;                 // The checklist item ID
   completedAt: string;       // ISO timestamp of when the item was completed
-  expiryDays: number;        // Number of days before this item expires
+  expiryDays?: number;       // Number of days before this item expires
 }
 
 /**
  * Represents a user's profile and progress in the gamified app.
  */
 export interface UserProfile {
-  userId: string;
-  point: number;
-  level: number;
-  badges: string[];
+  userId: string; // Firebase UID
+  point: number;  // Total points earned
+  level: number;  // Current user level
+  badges: string[]; // Achieved badges (if any)
+
   completedQuests: Record<
     string, // questId
     {
-      completedItems: Record<string, CompletedItem[]>; // categoryTitle -> array of completed items
-      completedDaysAgo?: number; // used only for quizzes (whole-quest expiration)
+      /**
+       * Checklist progress: categoryTitle -> array of completed items
+       * Only applicable for checklist quests
+       */
+      checklistItems?: Record<string, CompletedItem[]>;
+
+      /**
+       * Quiz progress: list of question IDs the user has completed
+       * Only applicable for quiz quests
+       */
+      completedQuizQuestionIds?: string[];
     }
   >;
 }
 
 /**
- * Fetches a user's profile from Firestore. If it doesn't exist, initializes it with default values.
+ * Fetches a user's profile from Firestore.
+ * If it doesn't exist, initializes it with default values.
+ *
  * @param userId The Firebase UID of the user
  * @returns The full UserProfile object
  */
@@ -63,6 +76,8 @@ export const getUserProfile = async (userId: string): Promise<UserProfile> => {
  * Saves checklist quest progress to Firestore using each item's `expiryDays`.
  * Only items that explicitly define `expiryDays` will be saved.
  *
+ * Quiz progress is handled separately via markQuestionCompleted().
+ *
  * @param userId Firebase UID of the user
  * @param quest The checklist quest to save progress for
  */
@@ -74,7 +89,7 @@ export const saveQuestProgress = async (userId: string, quest: Quest) => {
 
   const userDocRef = doc(db, 'users', userId);
 
-  const completedItems: Record<string, CompletedItem[]> = {};
+  const checklistItems: Record<string, CompletedItem[]> = {};
 
   quest.categories.forEach((category) => {
     const itemsToSave = category.items
@@ -94,18 +109,17 @@ export const saveQuestProgress = async (userId: string, quest: Quest) => {
       });
 
     if (itemsToSave.length > 0) {
-      completedItems[category.title] = itemsToSave;
+      checklistItems[category.title] = itemsToSave;
     }
   });
 
-  // Save progress to Firestore using merge to avoid overwriting other fields
+  // Save progress to Firestore using merge to avoid overwriting other fields like quiz progress
   await setDoc(
     userDocRef,
     {
       completedQuests: {
         [quest.id]: {
-          completedItems,
-          completedDaysAgo: 0, // still used for quizzes
+          checklistItems, // ✅ stored separately from quiz completions
         },
       },
     },
