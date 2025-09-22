@@ -1,6 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, FlatList, ScrollView } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { useQuestStore } from '../../src/state/questStore';
 import QuestCard from '../../src/components/QuestCard';
 import type { Quest } from '../../src/constants/quests/questConfig';
@@ -14,8 +13,7 @@ export default function PrepareScreen(): React.JSX.Element {
   const quizQuests = quests.filter((q: Quest) => q.format === 'quiz');
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      {/* ScrollView allows both lists to be scrolled together */}
+    <View style={styles.screen}>
       <ScrollView contentContainerStyle={styles.container}>
         {/* Screen header */}
         <Text style={styles.header}>Preparedness Quests</Text>
@@ -43,12 +41,12 @@ export default function PrepareScreen(): React.JSX.Element {
           </View>
         )}
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
+  screen: {
     flex: 1,
     backgroundColor: '#f4f7f9',
   },
@@ -60,11 +58,12 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontWeight: 'bold',
     color: '#2c3e50',
+    marginBottom: 4, // keep header closer to subheader
   },
   subHeader: {
     fontSize: 16,
     color: '#7f8c8d',
-    marginBottom: 24,
+    marginBottom: 20,
   },
   section: {
     marginBottom: 32,

@@ -41,7 +41,7 @@ export default function RootLayout() {
 
   return (
     <Stack>
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen name="(tabs)" options={{ headerShown: false, title: '' }} />
       <Stack.Screen name="quests/[questId]" />
       <Stack.Screen name="alert-detail/[alertId]" />
     </Stack>

@@ -34,11 +34,11 @@ export default function HomeScreen(): React.JSX.Element {
   const { weather, loading: weatherLoading } = useWeather();
 
   // Fetch location debug info
-  const {
-    locationInfo,
-    loading: locationLoading,
-    error: locationError,
-  } = useLocations();
+  // const {
+  //   locationInfo,
+  //   loading: locationLoading,
+  //   error: locationError,
+  // } = useLocations();
 
   // === Alert List Renderer ===
   const renderAlertSummary = (): React.JSX.Element => {
@@ -144,7 +144,7 @@ export default function HomeScreen(): React.JSX.Element {
       {/* Weather Section (if available) */}
       {!weatherLoading && weather && <WeatherCard weather={weather} />}
 
-      {/* Location Debug Info */}
+      {/* Location Debug Info
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>Location Debug Info</Text>
         {locationLoading && <ActivityIndicator />}
@@ -167,7 +167,7 @@ export default function HomeScreen(): React.JSX.Element {
             </Text>
           </View>
         )}
-      </View>
+      </View> */}
 
       {/* Latest Alerts */}
       <View style={styles.card}>
