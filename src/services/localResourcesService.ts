@@ -48,7 +48,6 @@ export const loadLocalResources = async (
     .filter((item) => {
       const lat = parseFloat(item.latitude);
       const lon = parseFloat(item.longitude);
-
       // Skip items with invalid coordinates
       if (isNaN(lat) || isNaN(lon)) return false;
 

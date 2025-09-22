@@ -13,12 +13,11 @@ const POINT_VALUES = {
 export const POINTS_FOR_NEXT_LEVEL = (level: number): number => level * 100;
 
 export const calculateLevel = (totalPoints: number): number => {
-  let level = 1;
-  while (totalPoints >= POINTS_FOR_NEXT_LEVEL(level + 1)) {
-    level++;
-  }
-  return level;
+  // Integer division gives the number of levels completed (0-indexed).
+  // 1-indexed (Level 1, Level 2, etc.).
+  return Math.floor(totalPoints / 100) + 1;
 };
+
 
 const awardPoints = async (userId: string, amount: number) => {
   const userRef = doc(db, 'users', userId);

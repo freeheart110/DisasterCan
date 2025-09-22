@@ -152,6 +152,7 @@ export const getLatestAlerts = async (): Promise<Alert[]> => {
 
     for (const { file, subdirUrl } of fileGroup) {
       const capUrl = `${subdirUrl}${file.filename}`;
+      console.log(`[DEBUG] Parsing file: ${file.filename} | ProductCode: ${file.productCode} | From: ${capUrl}`);
       try {
         const response = await axios.get(capUrl);
         const jsonData: { alert: CapAlert } = parser.parse(response.data);
