@@ -89,26 +89,19 @@ export const getLatestAlerts = async (): Promise<Alert[]> => {
   const allCapFiles: { file: ParsedFilename, subdirUrl: string }[] = [];
 
   const now = new Date();
-  const twelveHoursAgo = new Date(now.getTime() - 12 * 60 * 60 * 1000);
-
-  const nowUtcHour = now.getUTCHours(); // current hour UTC (e.g. 19)
-  const twelveHoursAgoUtcHour = twelveHoursAgo.getUTCHours(); // start hour UTC (e.g. 7)
   const todayUtcDate = now.toISOString().slice(0, 10).replace(/-/g, '');
-  const yesterday = new Date(now);
-  yesterday.setUTCDate(now.getUTCDate() - 1);
-  const yesterdayUtcDate = yesterday.toISOString().slice(0, 10).replace(/-/g, '');
 
   // Create a list of {date, hour} pairs for the last 12 hours
   const utcHoursToCheck: { date: string, baseUrl: string, hour: string }[] = [];
 
   for (let i = 0; i < 12; i++) {
-    const checkTime = new Date(now.getTime() - i * 60 * 60 * 1000); // Subtract i hours
+    const checkTime = new Date(now.getTime() - i * 60 * 60 * 1000);
     const utcDate = checkTime.toISOString().slice(0, 10).replace(/-/g, '');
     const utcHour = checkTime.getUTCHours().toString().padStart(2, '0') + '/';
 
-    const baseUrl = utcDate === todayUtcDate
-      ? `https://dd.weather.gc.ca/alerts/cap/${utcDate}/${region}/${utcHour}`
-      : `https://dd.weather.gc.ca/yesterday/alerts/cap/${utcDate}/${region}/${utcHour}`;
+    // ECCC Datamart uses /today/ for the current UTC date and /yesterday/ for the previous
+    const dayPrefix = utcDate === todayUtcDate ? 'today' : 'yesterday';
+    const baseUrl = `https://dd.weather.gc.ca/${dayPrefix}/alerts/cap/${utcDate}/${region}/${utcHour}`;
 
     utcHoursToCheck.push({ date: utcDate, baseUrl, hour: utcHour });
   }
@@ -187,7 +180,7 @@ export const getLatestAlerts = async (): Promise<Alert[]> => {
 
     // Use Alert_Location_Status to determine if active
     const locationStatusParam = latest.fullInfo.parameter?.find(p => p.valueName.includes('Alert_Location_Status'));
-    const isActive = locationStatusParam?.value === 'active';
+    const isActive = locationStatusParam?.value?.toLowerCase() === 'active';
 
     const alert: Alert = {
       id: productCode,

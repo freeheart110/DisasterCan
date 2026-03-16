@@ -10,6 +10,7 @@ export interface CompletedItem {
 
 export interface UserProfile {
   userId: string;
+  displayName?: string;
   point: number;
   level: number;
   badges: string[];
@@ -180,7 +181,7 @@ export const onProfileUpdate = (
 };
 
 // Limit updatable fields for type safety
-type UpdatableField = 'point' | 'level' | 'badges' | 'completedQuests';
+type UpdatableField = 'point' | 'level' | 'badges' | 'completedQuests' | 'displayName';
 
 /**
  * Generic updater for a single top-level user profile field.

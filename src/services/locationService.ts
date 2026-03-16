@@ -10,21 +10,23 @@ export interface LocationInfo {
   fullAddress: string;
 }
 
-// A mapping from province postal codes to Environment Canada region codes.
+// Maps province codes/names → Environment Canada region codes.
+// Includes both 2-letter abbreviations (Android) and full names (iOS CoreLocation).
 const provinceToRegionMap: { [key: string]: string } = {
-  BC: 'CWVR', // British Columbia
-  AB: 'CWWG', // Alberta (Prairies)
-  SK: 'CWWG', // Saskatchewan (Prairies)
-  MB: 'CWWG', // Manitoba (Prairies)
-  ON: 'CWTO', // Ontario
-  QC: 'CWUL', // Quebec
-  NB: 'CWHX', // New Brunswick (Atlantic)
-  NS: 'CWHX', // Nova Scotia (Atlantic)
-  PE: 'CWHX', // PEI (Atlantic)
-  NL: 'CWHX', // Newfoundland & Labrador (Atlantic)
-  YT: 'CWNT', // Yukon (Territories)
-  NT: 'CWNT', // Northwest Territories
-  NU: 'CWNT', // Nunavut
+  // 2-letter abbreviations
+  BC: 'CWVR', AB: 'CWWG', SK: 'CWWG', MB: 'CWWG',
+  ON: 'CWTO', QC: 'CWUL',
+  NB: 'CWHX', NS: 'CWHX', PE: 'CWHX', NL: 'CWHX',
+  YT: 'CWNT', NT: 'CWNT', NU: 'CWNT',
+  // Full names returned by iOS CoreLocation reverse geocoding
+  'British Columbia': 'CWVR',
+  'Alberta': 'CWWG', 'Saskatchewan': 'CWWG', 'Manitoba': 'CWWG',
+  'Ontario': 'CWTO',
+  'Quebec': 'CWUL', 'Québec': 'CWUL',
+  'New Brunswick': 'CWHX', 'Nova Scotia': 'CWHX',
+  'Prince Edward Island': 'CWHX',
+  'Newfoundland and Labrador': 'CWHX', 'Newfoundland & Labrador': 'CWHX',
+  'Yukon': 'CWNT', 'Northwest Territories': 'CWNT', 'Nunavut': 'CWNT',
 };
 
 /**
