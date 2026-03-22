@@ -87,7 +87,7 @@ const ProfileScreen = () => {
     );
   }
 
-  const badges = getEarnedBadges(profile);
+  const badges = getEarnedBadges(profile, quests);
   const { level, progress, currentPoint, requiredPoint } = getLevelBarProgress();
 
   const preparednessScore =

@@ -43,7 +43,7 @@ const WISPS = [
 
 // ── Theme helper ──────────────────────────────────────────────────────────────
 
-type WeatherType = 'clear-day' | 'clear-night' | 'cloudy' | 'cloudy-night' | 'rain' | 'snow' | 'thunderstorm' | 'mist';
+type WeatherType = 'clear-day' | 'clear-night' | 'cloudy' | 'cloudy-night' | 'rain' | 'snow' | 'snow-night' | 'thunderstorm' | 'mist' | 'mist-night';
 type GradientColors = readonly [string, string, ...string[]];
 
 function getWeatherTheme(id: number, icon: string): { gradient: GradientColors; type: WeatherType } {
@@ -51,8 +51,16 @@ function getWeatherTheme(id: number, icon: string): { gradient: GradientColors; 
   if (id >= 200 && id < 300) return { gradient: ['#1a1a2e', '#2c3e50'], type: 'thunderstorm' };
   if (id >= 300 && id < 400) return { gradient: ['#2c3e50', '#3d5a73'], type: 'rain' };
   if (id >= 500 && id < 600) return { gradient: ['#141e30', '#243b55'], type: 'rain' };
-  if (id >= 600 && id < 700) return { gradient: ['#b8cfe0', '#dde8f0', '#f0f5f9'], type: 'snow' };
-  if (id >= 700 && id < 800) return { gradient: ['#6b7b8d', '#9aacba'], type: 'mist' };
+  if (id >= 600 && id < 700) {
+    return isNight
+      ? { gradient: ['#0e1b2e', '#1c2e42', '#253d54'], type: 'snow-night' }
+      : { gradient: ['#b8cfe0', '#dde8f0', '#f0f5f9'], type: 'snow' };
+  }
+  if (id >= 700 && id < 800) {
+    return isNight
+      ? { gradient: ['#1a2535', '#2c3a4a'], type: 'mist-night' }
+      : { gradient: ['#6b7b8d', '#9aacba'], type: 'mist' };
+  }
   if (id === 800) {
     return isNight
       ? { gradient: ['#0d0d2b', '#1a1a4e', '#0f2b4d'], type: 'clear-night' }
@@ -236,11 +244,13 @@ function WeatherBackground({ type, cardWidth, cardHeight }: {
     case 'rain':          return <><RainLayer cardHeight={cardHeight} /></>;
     case 'thunderstorm':  return <><RainLayer cardHeight={cardHeight} /><LightningLayer /></>;
     case 'snow':          return <SnowLayer cardHeight={cardHeight} />;
+    case 'snow-night':    return <><StarLayer /><SnowLayer cardHeight={cardHeight} /></>;
     case 'clear-night':   return <><StarLayer /></>;
     case 'clear-day':     return <SunLayer />;
     case 'cloudy':
     case 'cloudy-night':  return <CloudLayer cardWidth={cardWidth} />;
-    case 'mist':          return <MistLayer cardWidth={cardWidth} />;
+    case 'mist':
+    case 'mist-night':    return <MistLayer cardWidth={cardWidth} />;
     default:              return null;
   }
 }

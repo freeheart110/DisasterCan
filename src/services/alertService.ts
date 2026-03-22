@@ -91,10 +91,10 @@ export const getLatestAlerts = async (): Promise<Alert[]> => {
   const now = new Date();
   const todayUtcDate = now.toISOString().slice(0, 10).replace(/-/g, '');
 
-  // Create a list of {date, hour} pairs for the last 12 hours
+  // Create a list of {date, hour} pairs for the last 24 hours
   const utcHoursToCheck: { date: string, baseUrl: string, hour: string }[] = [];
 
-  for (let i = 0; i < 12; i++) {
+  for (let i = 0; i < 24; i++) {
     const checkTime = new Date(now.getTime() - i * 60 * 60 * 1000);
     const utcDate = checkTime.toISOString().slice(0, 10).replace(/-/g, '');
     const utcHour = checkTime.getUTCHours().toString().padStart(2, '0') + '/';

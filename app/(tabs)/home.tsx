@@ -80,9 +80,10 @@ function AlertList({
   if (loading) return <ActivityIndicator color="#007AFF" style={{ marginTop: 10 }} />;
   if (error) return <Text style={styles.errorText}>Could not load alerts: {error}</Text>;
 
+  // Keep only the latest version per product code, regardless of isActive
   const grouped: { [code: string]: AlertItem } = {};
   alerts.forEach((alert) => {
-    if (alert.isActive && !grouped[alert.productCode]) {
+    if (!grouped[alert.productCode]) {
       grouped[alert.productCode] = alert;
     }
   });
@@ -93,7 +94,7 @@ function AlertList({
 
   if (list.length === 0) {
     return (
-      <Text style={styles.noAlertsText}>No active alerts in the past 12 hours.</Text>
+      <Text style={styles.noAlertsText}>No alerts in the past 24 hours.</Text>
     );
   }
 
@@ -118,9 +119,16 @@ function AlertList({
                   style={styles.alertIcon}
                 />
                 <View style={styles.alertTextContainer}>
-                  <Text style={[styles.alertEvent, { color: severityColor }]}>
-                    {item.event} ({item.severity})
-                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Text style={[styles.alertEvent, { color: severityColor }]}>
+                      {item.event} ({item.severity})
+                    </Text>
+                    {!item.isActive && (
+                      <View style={styles.endedBadge}>
+                        <Text style={styles.endedBadgeText}>Ended</Text>
+                      </View>
+                    )}
+                  </View>
                   <Text style={styles.alertTitle} numberOfLines={1}>
                     {item.headline}
                   </Text>
@@ -403,6 +411,8 @@ const styles = StyleSheet.create({
   alertEvent: { fontSize: 16, fontWeight: 'bold', textTransform: 'capitalize' },
   alertTitle: { fontSize: 14, color: '#7f8c8d' },
   alertTime: { fontSize: 12, fontWeight: '500', color: '#7f8c8d', marginLeft: 8 },
+  endedBadge: { backgroundColor: '#e0e0e0', borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1 },
+  endedBadgeText: { fontSize: 10, color: '#757575', fontWeight: '600' },
 
   // Shared button
   viewAllButton: {

@@ -22,6 +22,7 @@ interface QuestState {
   quests: Quest[]; // All loaded quests
   userProfile: UserProfile | null; // Fetched user profile
   isLoading: boolean; // Loading flag
+  newlyEarnedBadge: string | null; // Set when a badge is first earned
 
   // Actions
   initializeQuests: (userId: string, provinceCode: string) => Promise<void>;
@@ -42,12 +43,14 @@ interface QuestState {
   getQuestProgress: (questId: string) => number;
   makeQuizCompleted: (quest: Quest) => void;
   makeChecklistCompleted: (quest: Quest) => void;
+  clearNewlyEarnedBadge: () => void;
 }
 
 export const useQuestStore = create<QuestState>((set, get) => ({
   quests: [],
   userProfile: null,
   isLoading: true,
+  newlyEarnedBadge: null,
 
   // Load quests and initialize user progress
   async initializeQuests(userId, provinceCode) {
@@ -74,10 +77,11 @@ export const useQuestStore = create<QuestState>((set, get) => ({
             const matched = savedItems.find((i) => i.id === item.id);
 
             let isExpired = true;
-            let expiryDays: number | undefined = undefined;
+            // Prefer saved expiryDays, fall back to quest definition value
+            const expiryDays: number | undefined =
+              matched?.expiryDays ?? item.expiryDays;
 
-            if (matched?.completedAt && matched.expiryDays !== undefined) {
-              expiryDays = matched.expiryDays;
+            if (matched?.completedAt && expiryDays !== undefined) {
               const daysSince =
                 (now.getTime() - new Date(matched.completedAt).getTime()) /
                 (1000 * 60 * 60 * 24);
@@ -159,6 +163,12 @@ export const useQuestStore = create<QuestState>((set, get) => ({
 
       const updatedProfile = await getUserProfile(userId);
       set({ userProfile: updatedProfile });
+
+      // Evaluate badges after the fresh profile is loaded so the check sees
+      // the latest checklistItems saved to Firestore.
+      if (allCompleted) {
+        await evaluateAndAssignBadges(userId);
+      }
     }
   },
 
@@ -250,7 +260,11 @@ export const useQuestStore = create<QuestState>((set, get) => ({
 
     set({ userProfile: updatedProfile });
     saveChecklistCompletion(userProfile.userId, quest);
-    evaluateAndAssignBadges(userProfile.userId);
+    // Badge evaluation is handled in toggleItemCompleted after fresh profile load
+  },
+
+  clearNewlyEarnedBadge() {
+    set({ newlyEarnedBadge: null });
   },
 
   // Mark a quiz quest as completed
@@ -285,17 +299,29 @@ export const evaluateAndAssignBadges = async (userId: string) => {
   const profile = state.userProfile;
   if (!profile) return;
 
-  const earnedBadges = getEarnedBadges(profile);
+  const questSummary = state.quests.map(q => ({
+    id: q.id,
+    totalItems: q.categories?.flatMap(c => c.items).length ?? 0,
+    completedItems: q.categories?.flatMap(c => c.items).filter(i => i.completed).length ?? 0,
+  }));
+  console.log('🔍 evaluateAndAssignBadges — quest completion:', JSON.stringify(questSummary));
+
+  const earnedBadges = getEarnedBadges(profile, state.quests);
+  console.log('🔍 earnedBadges:', earnedBadges, '| existing:', profile.badges);
 
   const existing = profile.badges || [];
   const changed =
     JSON.stringify([...existing].sort()) !== JSON.stringify([...earnedBadges].sort());
 
   if (changed) {
+    const newlyEarned = earnedBadges.filter((b) => !existing.includes(b));
     await updateUserProfileField(userId, 'badges', earnedBadges);
     useQuestStore.setState({
       userProfile: { ...profile, badges: earnedBadges },
+      newlyEarnedBadge: newlyEarned[0] ?? null,
     });
-    console.log('🏅 Updated badges in Firestore:', earnedBadges);
+    console.log('🏅 Updated badges in Firestore:', earnedBadges, '| newlyEarned:', newlyEarned);
+  } else {
+    console.log('🔍 No badge change detected');
   }
 };

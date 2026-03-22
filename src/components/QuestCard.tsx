@@ -7,6 +7,8 @@ import type { Quest } from '../constants/quests/questConfig';
 
 // A reusable component for displaying a single quest card with progress
 const QuestCard = ({ quest }: { quest: Quest }) => {
+  // Subscribe to userProfile so this re-renders when progress changes
+  useQuestStore(state => state.userProfile);
   const getQuestProgress = useQuestStore(state => state.getQuestProgress);
   const progress = getQuestProgress(quest.id); // e.g., 60%
 

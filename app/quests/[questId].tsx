@@ -11,7 +11,6 @@ import type { ChecklistItem, QuizQuestion, Quest } from '../../src/constants/que
 import { PointPopUp } from '../../src/components/PointPopUp';
 import CompleteCelebration from '../../src/components/CompleteCelebration';
 import { awardPointForChecklistItem, awardPointForQuizAnswer } from '../../src/services/gamificationService';
-import { getEarnedBadges } from '../../src/services/badgeService';
 
 const ChecklistItemComponent = ({ item, onToggle }: { item: ChecklistItem; onToggle: () => void }) => {
   let expiryText = '';
@@ -164,10 +163,13 @@ export default function QuestDetailScreen(): React.JSX.Element {
   const toggleItemCompleted = useQuestStore((state) => state.toggleItemCompleted);
   const userProfile = useQuestStore((state) => state.userProfile);
 
+  const newlyEarnedBadge = useQuestStore((state) => state.newlyEarnedBadge);
+  const clearNewlyEarnedBadge = useQuestStore((state) => state.clearNewlyEarnedBadge);
+
   const [popUps, setPopUps] = useState<number[]>([]);
   const [showCelebration, setShowCelebration] = useState(false);
   const [celebratedQuests, setCelebratedQuests] = useState<Set<string>>(new Set());
-  const [celebrationMessage, setCelebrationMessage] = useState<string>('🎉 +5 Bonus points for finishing the quest!');
+  const [celebrationMessage, setCelebrationMessage] = useState<string>('🎉 Quest Complete! +5 bonus points!');
 
   const quest: Quest | undefined = quests.find((q) => q.id === questId);
 
@@ -185,22 +187,38 @@ export default function QuestDetailScreen(): React.JSX.Element {
   const handleQuizScore = (points: number, fullScore: boolean) => {
     if (points > 0) showPointPopUp(points);
     if (fullScore) {
-      checkBadgeEarned();
+      setCelebrationMessage('🎉 Quest Complete! +5 bonus points!');
       setShowCelebration(true);
       showPointPopUp(5);
     }
   };
 
-  const checkBadgeEarned = () => {
-    const profile = useQuestStore.getState().userProfile;
-      if (!profile) return;
-    const oldBadges = profile?.badges || [];
-    const newBadges = getEarnedBadges(profile);
-    const newlyEarned = newBadges.filter((badge) => !oldBadges.includes(badge));
-    if (newlyEarned.length > 0) {
-      setCelebrationMessage(`🎉 +5 bonus Points for finishing this quest and 🏅 Badge Earned: ${newlyEarned[0]} for completing both family plan and 72 hour kit`);
+  // When the current celebration closes, check if a badge was just earned
+  // and show it as a follow-up celebration. This ensures the badge screen
+  // is never swallowed by the quest-complete celebration's countdown timer.
+  const handleCelebrationComplete = () => {
+    setShowCelebration(false);
+    const pendingBadge = useQuestStore.getState().newlyEarnedBadge;
+    console.log('🎊 handleCelebrationComplete — pendingBadge:', pendingBadge);
+    if (pendingBadge) {
+      setTimeout(() => {
+        setCelebrationMessage(`🏅 Badge Earned: "${pendingBadge}"!`);
+        setShowCelebration(true);
+        clearNewlyEarnedBadge();
+      }, 300);
     }
   };
+
+  // Fallback: if no celebration is currently showing and a badge arrives
+  // (e.g. evaluation finished after the celebration already closed), show it now.
+  useEffect(() => {
+    console.log('🎊 badge useEffect — newlyEarnedBadge:', newlyEarnedBadge, 'showCelebration:', showCelebration);
+    if (newlyEarnedBadge && !showCelebration) {
+      setCelebrationMessage(`🏅 Badge Earned: "${newlyEarnedBadge}"!`);
+      setShowCelebration(true);
+      clearNewlyEarnedBadge();
+    }
+  }, [newlyEarnedBadge, showCelebration]);
 
   useEffect(() => {
     if (quest?.format === 'checklist' && quest.categories) {
@@ -209,7 +227,7 @@ export default function QuestDetailScreen(): React.JSX.Element {
       const alreadyCelebrated = celebratedQuests.has(quest.id);
 
       if (allCompleted && !alreadyCelebrated) {
-        checkBadgeEarned();
+        setCelebrationMessage('🎉 Quest Complete! +5 bonus points!');
         setShowCelebration(true);
         showPointPopUp(5);
         setCelebratedQuests((prev) => new Set(prev).add(quest.id));
@@ -242,7 +260,7 @@ export default function QuestDetailScreen(): React.JSX.Element {
       {showCelebration && (
         <CompleteCelebration
           message={celebrationMessage}
-          onComplete={() => setShowCelebration(false)}
+          onComplete={handleCelebrationComplete}
         />
       )}
 
